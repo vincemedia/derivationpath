@@ -1,381 +1,239 @@
-import { useState } from 'react';
-import { Mnemonic, HD, PrivateKey, PublicKey, P2PKH, Transaction, Utils, WalletClient, type CreateActionInput, Beef, type SignActionSpend, type PositiveIntegerOrZero } from '@bsv/sdk';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import { AppContext, type AppState, type LockState, type Selection, type Session } from './state';
+import { createApi } from './lib/net';
+import { loadSettings, saveSettings, type Settings } from './lib/settings';
+import { DEFAULT_PRESET, addressFingerprint, deriveKey, presetById, rootFromMnemonic, validateMnemonic, validateTemplate } from './lib/derive';
+import { localVault, type SeedRecord } from './lib/vault';
+import { errorMessage, fmtSats, fmtUsd, safeInt } from './lib/format';
+import { useAutoLock } from './hooks/useAutoLock';
+import { useTheme } from './hooks/useTheme';
+import { ArrowUpRight, Clock3, FileLock2, Gem, KeyRound, Moon, RefreshCw, ScanSearch, ShieldAlert, SlidersHorizontal, Sun } from 'lucide-react';
+import { BsvLogo } from './components/BsvLogo';
+import { useConfirmDialog } from './components/ConfirmDialog';
+import { WalletPanel } from './components/WalletPanel';
+import { SendPanel } from './components/SendPanel';
+import { RecoverPanel } from './components/RecoverPanel';
+import { TokensPanel } from './components/TokensPanel';
+import { HistoryPanel } from './components/HistoryPanel';
+import { BackupPanel } from './components/BackupPanel';
+import { SettingsPanel } from './components/SettingsPanel';
 
+const PANELS = [
+  { id: 'wallet', label: 'Wallet', caption: 'Phrase & derivation path', icon: KeyRound, Component: WalletPanel },
+  { id: 'recover', label: 'Recover', caption: 'Find & sweep funds', icon: ScanSearch, Component: RecoverPanel },
+  { id: 'send', label: 'Send', caption: 'Pay from this address', icon: ArrowUpRight, Component: SendPanel },
+  { id: 'tokens', label: 'Tokens', caption: 'Ordinals & BSV-20', icon: Gem, Component: TokensPanel },
+  { id: 'history', label: 'History', caption: 'Past transactions', icon: Clock3, Component: HistoryPanel },
+  { id: 'backup', label: 'Backup', caption: 'Encrypted export', icon: FileLock2, Component: BackupPanel },
+  { id: 'settings', label: 'Settings', caption: 'Network & fees', icon: SlidersHorizontal, Component: SettingsPanel },
+] as const;
 
-/** FIFO queue for throttling API requests to max 3 per second */
-const requestQueue: { url: string; resolve: (value: Response) => void; reject: (reason?: unknown) => void; }[] = [];
+const defaultSelection = (): Selection => ({
+  presetId: DEFAULT_PRESET,
+  template: presetById(DEFAULT_PRESET)!.template,
+  chain: 0,
+  index: 0,
+});
 
-let isProcessing = false;
-
-let lastRequestTime = 0;
-
-const MIN_INTERVAL = 334; // ms for ~3 requests per second
-
-const wallet = new WalletClient()
-
-async function queuedFetch(url: string): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    requestQueue.push({ url, resolve, reject });
-    if (!isProcessing) {
-      processQueue();
-    }
-  });
-}
-
-async function processQueue() {
-  isProcessing = true;
-  while (requestQueue.length > 0) {
-    const now = Date.now();
-    const timeSinceLast = now - lastRequestTime;
-    if (timeSinceLast < MIN_INTERVAL) {
-      await new Promise(resolve => setTimeout(resolve, MIN_INTERVAL - timeSinceLast));
-    }
-    lastRequestTime = Date.now();
-    const item = requestQueue.shift()!;
-    try {
-      const response = await fetch(item.url);
-      item.resolve(response);
-    } catch (error) {
-      item.reject(error);
-    }
-  }
-  isProcessing = false;
-}
-
-interface wocUTXO {
-  height: number;
-  tx_pos: number;
-  tx_hash: string;
-  value: number;
-  isSpentInMempoolTx: boolean;
-}
-
-interface utxoResponse {
-  address: string;
-  error: string;
-  result: wocUTXO[];
-  script: string;
-}
-
-interface Result {
-  index: number;
-  address: string;
-  balance: number;
-  count: number;
-  utxos: utxoResponse;
-  pathPrefix: string;
-}
+const NO_LOCK: LockState = { engaged: false, reason: '' };
 
 function App() {
-  const [mnemonic, setMnemonic] = useState<string>('');
-  const [pin, setPin] = useState<string>('');
-  const [pathPrefix, setPathPrefix] = useState<string>("m/44'/0/0");
-  const [results, setResults] = useState<Result[]>([]);
-  const [txHex, setTxHex] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<string>('');
-  const [error, setError] = useState<string>('');
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const api = useMemo(() => createApi(settings), [settings]);
+  const [price, setPrice] = useState(0);
+  const [priceNote, setPriceNote] = useState('USD per BSV');
 
-const [consecutiveUnusedGap, setConsecutiveUnusedGap] = useState<number>(5);
+  const [session, setSession] = useState<Session | null>(null);
+  const [selection, setSelection] = useState<Selection>(defaultSelection);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [fingerprint, setFingerprint] = useState('');
+  const [lock, setLock] = useState<LockState>(NO_LOCK);
+  const [notice, setNotice] = useState('');
+  const [vaultExists, setVaultExists] = useState(localVault.exists);
+  const [panel, setPanel] = useState<string>('wallet');
+  // Bumped whenever the session is replaced or wiped: panels are keyed on it,
+  // so every derived key, scan result and built tx they hold is discarded.
+  const [epoch, setEpoch] = useState(0);
+  const busyRef = useRef(0);
+  const { confirm, dialog } = useConfirmDialog();
+  const { theme, toggle: toggleTheme } = useTheme();
 
-const [startOffset, setStartOffset] = useState<number>(0);
-
-const generateAddresses = async (e?: React.MouseEvent<HTMLButtonElement>) => {
-  e?.preventDefault(); // Prevent form submission
-  setError(''); // Clear any previous errors
-  setIsLoading('Generating seed...');
-    let seed: number[];
+  const { selected, selectedError } = useMemo(() => {
+    if (!session) return { selected: null, selectedError: '' };
     try {
-      const mn = new Mnemonic(mnemonic);
-      seed = mn.toSeed(pin);
+      return { selected: deriveKey(session.root, selection.template, selection.chain, selection.index), selectedError: '' };
+    } catch (e) {
+      return { selected: null, selectedError: `Could not derive ${selection.template}: ${errorMessage(e)}` };
+    }
+  }, [session, selection]);
+
+  useEffect(() => {
+    let live = true;
+    setFingerprint('');
+    if (selected) void addressFingerprint(selected.address, selected.path).then(f => { if (live) setFingerprint(f); });
+    return () => { live = false; };
+  }, [selected]);
+
+  const reloadPrice = useCallback(async () => {
+    try {
+      const data = await api.woc.price();
+      setPrice(Number(data.rate || 0));
+      setPriceNote(data.rate ? `${data.currency || 'USD'} per BSV` : 'No market rate returned');
+    } catch (e) {
+      setPrice(0);
+      setPriceNote(errorMessage(e));
+    }
+  }, [api]);
+  useEffect(() => { void reloadPrice(); }, [reloadPrice]);
+
+  const address = selected?.address;
+  const refreshBalance = useCallback(async () => {
+    if (!address) { setBalance(null); return; }
+    try {
+      const data = await api.woc.balance(address);
+      setBalance(Number(data.confirmed || 0) + Number(data.unconfirmed || 0));
     } catch {
-      setError('Invalid mnemonic or PIN');
-      setIsLoading('');
-      return;
+      setBalance(null);
     }
+  }, [api, address]);
+  useEffect(() => { void refreshBalance(); }, [refreshBalance]);
 
-    const masterKey = HD.fromSeed(seed);
-  setIsLoading('Searching for used addresses...');
+  const loadWallet = useCallback((mnemonic: string, passphrase: string, message: string, sel?: Selection) => {
+    const normalized = validateMnemonic(mnemonic);
+    const root = rootFromMnemonic(normalized, passphrase);
+    setSession({ mnemonic: normalized, passphrase, root });
+    if (sel) setSelection(sel);
+    setLock(NO_LOCK);
+    setNotice(message);
+    setEpoch(e => e + 1);
+  }, []);
 
-    let index = startOffset;
-    let consecutiveUnused = 0;
-    const usedResults: Result[] = [];
-
-    while (consecutiveUnused < consecutiveUnusedGap) {
-      try {
-        const fullPath = `${pathPrefix}/${index}`.replace(/’/g, "'");
-        const childKey  = masterKey.derive(fullPath);
-        const privKey = childKey.privKey as PrivateKey;
-        const pubKey = privKey.toPublicKey() as PublicKey;
-        const address = pubKey.toAddress().toString();
-        console.log({ address })
-        setIsLoading(`Checking address ${index}: ${address}`);
-
-        // Check if ever used (using history length > 0)
-        const historyRes = await queuedFetch(`https://api.whatsonchain.com/v1/bsv/main/address/${address}/history`);
-        const history = await historyRes.json();
-        const isUsed = history.length > 0;
-
-        if (isUsed) {
-          // Fetch current UTXOs
-          const unspentRes = await queuedFetch(`https://api.whatsonchain.com/v1/bsv/main/address/${address}/unspent/all`);
-          const utxos = await unspentRes.json();
-          const spendableUTXOs = utxos.result.filter((utxo: { isSpentInMempoolTx: boolean }) => !utxo.isSpentInMempoolTx);
-          if (spendableUTXOs.length > 0) {
-            console.log('success')
-            const filteredUtxos = { ...utxos, result: spendableUTXOs }
-            const balance = spendableUTXOs.reduce((sum: number, utxo: { value: number }) => sum + utxo.value, 0);
-            usedResults.push({ index, address, balance, count: spendableUTXOs.length, utxos: filteredUtxos, pathPrefix });
-          }
-          consecutiveUnused = 0;
-        } else {
-          consecutiveUnused++;
-        }
-        index++;
-      } catch (error) {
-        console.error({ error })
-        break
-      }
-    }
-
-    setResults(r => {
-      const set = new Set()
-      r.forEach(r => set.add(r.address))
-      usedResults.forEach(r => set.add(r.address))
-      const uniqueResults = [...set]
-      const updatedResults = uniqueResults.map(address => r.find(r => r.address === address) || usedResults.find(r => r.address === address) || undefined)
-      return updatedResults.filter(r => r !== undefined)
+  const restoreRecord = useCallback((record: SeedRecord, message: string) => {
+    const template = validateTemplate(record.template);
+    const preset = presetById(record.presetId);
+    loadWallet(record.mnemonic, record.passphrase || '', message, {
+      presetId: preset && preset.template === template ? preset.id : 'custom',
+      template,
+      chain: safeInt(record.chain),
+      index: safeInt(record.index),
     });
-    setTxHex('');
-    setIsLoading('');
-  };
+  }, [loadWallet]);
 
-  const createIngestTx = async () => {
-    setError(''); // Clear any previous errors
-    try {
-      const { authenticated } = await wallet.isAuthenticated();
-      if (!authenticated) {
-        const errorMsg = 'Unable to connect to wallet, please download Metanet Desktop from https://metanet.bsvb.tech';
-        setError(errorMsg);
-        return;
-      }
-    } catch {
-      const errorMsg = 'Unable to connect to wallet, please download Metanet Desktop from https://metanet.bsvb.tech';
-      setError(errorMsg);
-      return;
-    }
-    if (results.length === 0) {
-      setError('No outputs found to ingest');
-      return;
-    }
-    try {
-      setIsLoading('Creating ingest transaction...');
-      console.log({ results })
+  // Removes every trace of the wallet from state. Shared by Clear and by
+  // auto-lock — a lock that left the mnemonic in a hidden input would be decoration.
+  const wipe = useCallback((message: string) => {
+    setSession(null);
+    setBalance(null);
+    setNotice(message);
+    setEpoch(e => e + 1);
+  }, []);
 
-      const seed = new Mnemonic().fromString(mnemonic).toSeed(pin);
-      const masterKey = HD.fromSeed(seed);
+  const engageLock = useCallback((reason: string) => {
+    wipe('Wallet locked. Keys have been cleared from memory.');
+    setLock({ engaged: true, reason });
+    setPanel('wallet');
+  }, [wipe]);
 
-      // Collect all UTXOs with their details
-      const utxosByTxid: { [key: string]: { vout: number; privKey: PrivateKey; value: number }[] } = {};
-      results.forEach(res => {
-        const fullPath = `${res.pathPrefix}/${res.index}`.replace(/’/g, "'");
-        const childKey = masterKey.derive(fullPath);
-        const privKey = childKey.privKey as PrivateKey;
-        console.log({ address: privKey.toAddress() })
+  const clearWallet = useCallback(() => {
+    setLock(NO_LOCK);
+    wipe('Wallet cleared from this page session.');
+  }, [wipe]);
 
-        res.utxos.result.forEach((utxo: { tx_hash: string; tx_pos: number; value: number }) => {
-          const txid = utxo.tx_hash;
-          if (!utxosByTxid[txid]) {
-            utxosByTxid[txid] = [];
-          }
-          utxosByTxid[txid].push({ vout: utxo.tx_pos, privKey, value: utxo.value });
-        });
-      });
+  const lockNow = useCallback(() => engageLock('you locked it'), [engageLock]);
 
-      const beef = new Beef()
-      const inputs: CreateActionInput[] = []
+  useAutoLock(!!session, engageLock, busyRef);
 
-      for (const [txid, utxoList] of Object.entries(utxosByTxid)) {
-        setIsLoading(`Fetching BEEF for txid ${txid}...`);
-        const beefRes = await queuedFetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid}/beef`);
-        const beefHex = await beefRes.text();
-        const beefBytes = Utils.toArray(beefHex, 'hex'); // Adjusted to fromHex assuming it returns bytes
-        beef.mergeBeef(beefBytes);
+  const beginBusy = useCallback(() => {
+    busyRef.current++;
+    let released = false;
+    return () => { if (!released) { released = true; busyRef.current--; } };
+  }, []);
 
-        utxoList.forEach(utxo => {
-          inputs.push({
-            inputDescription: 'from mnemonic',
-            unlockingScriptLength: 108,
-            outpoint: txid + '.' + String(utxo.vout)
-          })
-        });
-      }
+  const updateSettings = useCallback((s: Settings) => {
+    setSettings(s);
+    saveSettings(s);
+  }, []);
 
-      // First we call createAction to get outputs for the tx automatically assigned by the utxo manager.
-      setIsLoading('Creating outputs for Wallet')    
-      const { signableTransaction } = await wallet.createAction({
-        inputBEEF: beef.toBinary(),
-        description: 'Ingesting Swept funds from mnemonic',
-        inputs
-      })
+  const syncVault = useCallback(() => setVaultExists(localVault.exists()), []);
 
-      if (!signableTransaction) {
-        throw new Error('Failed to create action');
-      }
-
-      const tx = Transaction.fromAtomicBEEF(signableTransaction.tx)
-
-      // We check that the fees are reasonable for the size of the tx.
-      const sats = tx.getFee()
-      const size = tx.toBinary().length
-      const kb = size / 1000
-      const satsPerKb = sats / kb
-      console.log({ sats, size, kb, satsPerKb })
-      if (sats > 1 && satsPerKb > 1000) {
-        throw new Error('Fee too high, aborting')
-      }
-
-      // We sign sighash all to ensure tx cannot be changed.
-      setIsLoading('Signing Tx');
-      tx.inputs.forEach(input => {
-        const txid = input.sourceTransaction!.id('hex')
-        const privKey = utxosByTxid[txid].find(utxo => utxo.vout === input.sourceOutputIndex)?.privKey;
-        console.log({ addressSign: privKey?.toAddress() })
-        if (!privKey) {
-          throw new Error('Failed to find private key for input: ' + txid + '.' + input.sourceOutputIndex);
-        }
-        input.unlockingScriptTemplate = new P2PKH().unlock(privKey)
-      });
-
-      await tx.sign()
-
-      const spends: Record<PositiveIntegerOrZero, SignActionSpend> = {}
-
-      tx.inputs.forEach((input, index) => {
-        spends[index] = {
-          unlockingScript: input.unlockingScript!.toHex()
-        }
-      })
-
-      setIsLoading('Broadcasting...');
-
-      const { txid } = await wallet.signAction({
-        reference: signableTransaction.reference,
-        spends,
-        options: {
-          acceptDelayedBroadcast: false,
-          returnTXIDOnly: true
-        }
-      })
-
-      console.log({ txid })
-      if (!txid) {
-        throw new Error('Failed to broadcast transaction');
-      }
-
-      setTxHex(tx.toHex())
-
-      // clear all results so we don't accidentally spend them again.
-      setResults([])
-    } catch (error) {
-      console.error({ error })
-      setError(JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
-    } finally {
-      setIsLoading('');
-    }
+  const state: AppState = {
+    settings, updateSettings, api, price, reloadPrice,
+    session, selection, setSelection, selected, selectedError, fingerprint, balance, refreshBalance,
+    loadWallet, restoreRecord, clearWallet, lockNow, lock, notice,
+    vaultExists, syncVault, confirm, beginBusy,
   };
 
   return (
-    <div className="app-container">
-      <h1>Mnemonic to BRC-100</h1>
-      <p>Use at your own risk. Preferably run this locally after inspecting the <a href="https://github.com/bsv-blockchain-demos/mnemonic-to-brc100">Source Code</a> yourself. This website is provided as-is with no warranties, nor guarantees. See <a href="/LICENSE.txt">LICENSE</a> for details.</p>
-      <p>If you have made a successful transfer and wish to make another, hard refresh the page to clear all results so you don't accidentally attempt to spend those same coins again.</p>
-      <form className="input-form">
-        <div className="form-group">
-          <label>Mnemonic:</label>
-          <textarea className="form-input" value={mnemonic} onChange={e => setMnemonic(e.target.value)} />
+    <AppContext.Provider value={state}>
+      <div className="shell">
+        <header className="topbar">
+          <div className="brand">
+            <BsvLogo className="brand-logo" />
+            <span className="wordmark">Mnemonic <span>to BRC-100</span></span>
+          </div>
+          <div className="topbar-right">
+            <span className="pill tnum" title={priceNote}>
+              <BsvLogo className="bsv-mark" darkGlyph />
+              {price ? `$${price.toFixed(2)}` : '—'}
+            </span>
+            <span className="pill network"><span className="dot" />Mainnet · local</span>
+            <button className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+          </div>
+        </header>
+
+        <section className="intro">
+          <div className="eyebrow">Keys stay in your browser</div>
+          <h2>Find, recover and move your BSV.</h2>
+          <p>Import a phrase from Centbee, RockWallet, ElectrumSV and more, find every funded address, and sweep it into your BRC-100 wallet.</p>
+        </section>
+
+        <div className="notice">
+          <ShieldAlert size={18} aria-hidden />
+          <div><b>Use at your own risk.</b> Preferably run this locally after inspecting the <a href="https://github.com/bsv-blockchain-demos/mnemonic-to-brc100" target="_blank" rel="noopener noreferrer">source code</a>. Never enter a valuable phrase on a shared or untrusted device, and review every transaction before broadcasting. Provided as-is — see <a href="/LICENSE.txt">LICENSE</a>.</div>
         </div>
-        <div className="form-group">
-          <label>PIN:</label>
-          <input className="form-input" type="password" value={pin} onChange={e => setPin(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label>Derivation Path Prefix:</label>
-          <input className="form-input" value={pathPrefix} onChange={e => setPathPrefix(e.target.value)} />
-          <table className="path-table">
-            <thead>
-              <tr>
-                <th>Wallet</th>
-                <th>Derivation Path</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr onClick={() => setPathPrefix("m/44'/0/0")}>
-                <td>Centbee</td>
-                <td><code>m/44'/0/0</code></td>
-              </tr>
-              <tr onClick={() => setPathPrefix("m/0'/0")}>
-                <td>Rock Wallet</td>
-                <td><code>m/0'/0</code></td>
-              </tr>
-              <tr onClick={() => setPathPrefix("m/44'/236'/0'")}>
-                <td>Electrum SV</td>
-                <td><code>m/44'/236'/0'</code></td>
-              </tr>
-              <tr onClick={() => setPathPrefix("m/44'/0'/0'")}>
-                <td>Common elsewhere</td>
-                <td><code>m/44'/0'/0'</code></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="form-group">
-          <label>Consecutive Unused Gap:</label>
-          <input className="form-input" type="number" value={consecutiveUnusedGap} onChange={e => setConsecutiveUnusedGap(parseInt(e.target.value) || 0)} />
-        </div>
-        <div className="form-group">
-          <label>Start Offset:</label>
-          <input className="form-input" type="number" value={startOffset} onChange={e => setStartOffset(parseInt(e.target.value) || 0)} />
-        </div>
-        <button className="primary-button" onClick={generateAddresses} disabled={!!isLoading}>Derive and Check Balance of Addresses</button>
-      </form>
-      {error && (
-        <div className="error-box">
-          <strong>Error:</strong>
-          <pre>{error}</pre>
-        </div>
-      )}
-      {isLoading && <p>{isLoading}</p>}
-      {results.length > 0 && (
-        <div className="results-container">
-          <table className="utxo-table">
-            <thead>
-              <tr>
-                <th>Index</th>
-                <th>Address</th>
-                <th>Balance (sat)</th>
-                <th>UTXO Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((res, i) => (
-                <tr key={i}>
-                  <td>{res.index}</td>
-                  <td>{res.address}</td>
-                  <td>{res.balance}</td>
-                  <td>{res.count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="primary-button" onClick={createIngestTx} disabled={!!isLoading}>Sweep Into My Local Wallet</button>
-        </div>
-      )}
-      {txHex && <div className="tx-result">
-        <a className="tx-link" href={`https://whatsonchain.com/tx/${Transaction.fromHex(txHex).id('hex')}`} target="_blank">View on What's On Chain</a>
-        <pre className="tx-hex">{txHex}</pre>
-      </div>}
-    </div>
+
+        <main className="layout">
+          <aside className="sidebar">
+            <div className="card balance-block">
+              <div className="label-caps">Selected address</div>
+              <div className="balance-sats">{balance === null ? '—' : fmtSats(balance)} <small>sats</small></div>
+              <div className="balance-usd">{balance === null ? '— USD' : fmtUsd(balance, price)}</div>
+              {selected && <div className="balance-path mono">{selected.path}</div>}
+              <div className="actions">
+                <button className="btn btn-secondary btn-sm" disabled={!selected} onClick={() => void refreshBalance()}><RefreshCw size={14} /> Refresh</button>
+              </div>
+            </div>
+            <div className="card">
+              <nav className="nav" aria-label="Wallet tools">
+                {PANELS.map(({ id, label, caption, icon: Icon }) => (
+                  <button key={id} className={panel === id ? 'active' : ''} aria-current={panel === id ? 'page' : undefined} onClick={() => setPanel(id)}>
+                    <span className="chip" aria-hidden><Icon size={18} /></span>
+                    <span className="nav-text"><span className="nav-label">{label}</span><span className="nav-caption">{caption}</span></span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </aside>
+
+          <section>
+            {PANELS.map(({ id, Component }) => (
+              <div key={`${id}-${epoch}`} className={`panel${panel === id ? ' active' : ''}`}>
+                <Component />
+              </div>
+            ))}
+          </section>
+        </main>
+
+        <footer className="footer">
+          Mnemonic to BRC-100 · Use at your own risk ·{' '}
+          <a href="https://github.com/bsv-blockchain-demos/mnemonic-to-brc100" target="_blank" rel="noopener noreferrer">source</a>
+        </footer>
+      </div>
+      {dialog}
+    </AppContext.Provider>
   );
 }
 

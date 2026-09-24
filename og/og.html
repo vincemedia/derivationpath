@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Source for public/og.png. Render with: python3 og/render.py -->
+<style>
+@font-face { font-family: 'Nunito'; src: url('../node_modules/@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2') format('woff2'); font-weight: 200 1000; }
+* { box-sizing: border-box; margin: 0; }
+body { width: 1200px; height: 630px; overflow: hidden; background: #2d2d31; font-family: 'Nunito', sans-serif; color: #f4f2f0; position: relative; -webkit-font-smoothing: antialiased; }
+/* soft gold light, top right — the wallet's ambient glow */
+body::before { content: ''; position: absolute; inset: 0; background: radial-gradient(900px 500px at 88% -10%, rgba(255,175,0,.10), transparent 60%); }
+.brand { position: absolute; left: 82px; top: 62px; display: flex; align-items: center; gap: 16px; }
+.brand svg { width: 56px; height: 56px; }
+.brand span { font-size: 50px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.brand span b { font-weight: 600; opacity: .6; }
+h1 { position: absolute; left: 663px; top: 58px; width: 470px; font-size: 56px; font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; }
+.tile { position: absolute; height: 76px; border-radius: 16px; background: #38383d; }
+.bar { position: absolute; height: 88px; width: 470px; border-radius: 16px; display: flex; align-items: center; padding-left: 40px;
+        font-size: 29px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums lining-nums;
+        box-shadow: 0 18px 40px -18px rgba(0,0,0,.55); transform-origin: center; }
+.gold  { background: #ffaf00; color: #2d2d31; }
+.paper { background: #f4f2f0; color: #2d2d31; }
+.soft  { background: #ffe4a8; color: #8a5a00; }
+.deep  { background: #9b6a14; color: #f4f2f0; }
+</style></head>
+<body>
+  <div class="brand">
+    <svg viewBox="0 0 2500 2500"><path fill="#EAB300" d="M2496,1149c56,688-457,1292-1145,1347c-67,5-135,5-203,0C543,2448,52,1957,4,1351C-52,663,461,59,1149,4 c67-5,135-5,203,0C1957,52,2448,543,2496,1149z"/><path fill="#fff" d="M1608,1206c74-51,125-109,125-217c0-172-172-253-276-264c-9-1-32-2-32-2V558h-170l1,165h-114V559H969v163 c-30,1-213,1-213,1v146c0,0,46,0,60,0c57,0,84,36,84,61v9v630c-1,22-17,39-39,41c-26,1-65,0-65,0l-33,166h208v166h173v-166h114 v166h169v-166c0,0,9,0,12,0c196,0,366-116,369-303c2-154-129-243-199-268L1608,1206z M1143,1131V880c23,0,109,0,160,0 c5,0,9,1,13,1c70,3,113,31,136,64c14,20,22,44,22,68c0,17-3,34-9,50c-5,14-12,27-22,39c-8,10-16,18-26,25c-26,19-63,32-114,35 c-1,0-158,1-161,0v-31H1143z M1526,1502c-5,15-13,29-23,42c-8,11-18,19-29,27c-28,20-67,36-124,38c-1,0-205,1-207,1v-305 c25,0,151,1,206,1c5,0,9,1,15,1c75,4,122,33,147,70c15,22,24,47,25,74c-2,18-5,36-10,53l0,0V1502z"/></svg>
+    <span>Derivation<b>Path</b></span>
+  </div>
+  <h1>Recover BSV from any seed phrase.</h1>
+
+  <!-- brick rows behind the bars -->
+  <div class="tile" style="left:-40px; top:393px; width:110px"></div>
+  <div class="tile" style="left:1025px; top:393px; width:230px"></div>
+  <div class="tile" style="left:-40px; top:478px; width:235px"></div>
+  <div class="tile" style="left:1000px; top:478px; width:260px"></div>
+  <div class="tile" style="left:-40px; top:563px; width:258px"></div>
+  <div class="tile" style="left:228px; top:563px; width:310px"></div>
+  <div class="tile" style="left:1133px; top:563px; width:120px"></div>
+
+  <div class="bar gold"  style="left:80px;  top:348px; transform: rotate(-10deg)">m/44'/0'/0'/0/0</div>
+  <div class="bar paper" style="left:533px; top:406px; transform: rotate(7deg)">m/44'/236'/0'/1/7</div>
+  <div class="bar soft"  style="left:208px; top:466px; transform: rotate(4deg)">m/44'/0/0/12</div>
+  <div class="bar deep"  style="left:612px; top:564px; transform: rotate(0deg)">m/0'/0/3</div>
+</body></html>

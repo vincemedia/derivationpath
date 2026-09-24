@@ -8,10 +8,14 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "npx tsx test-key-alignment.ts && npx tsx test-signature-validation.ts && npx tsx test-transaction-signing.ts"
+    "test": "vitest run && npm run test:legacy",
+    "test:unit": "vitest run",
+    "test:legacy": "npx tsx test-key-alignment.ts && npx tsx test-signature-validation.ts && npx tsx test-transaction-signing.ts"
   },
   "dependencies": {
     "@bsv/sdk": "^1.8.2",
+    "@fontsource-variable/nunito": "^5.3.0",
+    "lucide-react": "^1.48.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

@@ -6,11 +6,20 @@ This tool helps recover funds from Bitcoin SV (BSV) wallets that may no longer b
 For maximum security, we strongly recommend running this tool locally on your own machine. This ensures that your mnemonic phrase and PIN never leave your device. If you use the hosted version at [mnemonic-brc100.vercel.app](https://mnemonic-brc100.vercel.app), you must trust the host (@sirdeggen on GitHub) not to capture or misuse your sensitive information. Running locally eliminates this trust requirement and is the safer option when dealing with private keys and funds recovery.
 
 ## Features
-- Derive addresses from a mnemonic phrase using a specified derivation path prefix.
-- Scan for used addresses with transaction history and current UTXOs.
-- Calculate balances and display results in a table.
-- Generate an ingest transaction to sweep funds into a BRC-100 compatible format.
-- Modern, responsive design for mobile and desktop.
+- **Wallet & derivation** — import a 12–24 word BIP39 phrase (with optional PIN / BIP39 passphrase) or generate a new one. Pick a wallet preset (Centbee, RockWallet, BIP44, MoneyButton, Twetch, ElectrumSV, Exodus, RelayX, Keevo, Atomic, SimplyCash, BIP32) or type any template such as `m/44'/0'/0'/{chain}/{index}`. Shows address, public key, fingerprint and (behind a confirm) the WIF and mnemonic.
+- **Recover** — gap-limit discovery across receive and change chains, on one template or every known preset at once. Sweep the funded UTXOs into a local **BRC-100 wallet** (Metanet Desktop) or to **any BSV address**.
+- **Send** — build, review and broadcast a signed P2PKH transaction from the selected address, including "send entire balance".
+- **Tokens** — read-only list of 1Sat ordinals and BSV-20 balances at the selected address.
+- **History** — transactions across a window of derived addresses.
+- **Backup** — AES-GCM (PBKDF2-SHA256, 310k iterations) encrypted backup, saved in the browser or downloaded. It can also restore SatoFinder backups.
+- **Settings** — WhatsOnChain API base, explorer URL and fee rate.
+
+### Safety rails
+- **Ordinal/token protection:** every spend checks GorillaPool's 1Sat indexer, including BSV-20 outputs and paged results. Flagged outputs and every 1-sat output are left untouched. If the indexer is unreachable, no transaction is built.
+- **Source verification:** before signing, each input's source transaction is checked to be a plain P2PKH output of the reported value to the derived address, so an inscription or a misreported amount is refused.
+- **Fail closed:** API calls are rate-limited and retried; a scan that can't reach the API aborts instead of reporting a partial result as complete.
+- **Auto-lock:** keys are wiped after 10 minutes idle or 60 seconds with the tab hidden. With a browser backup saved, unlock with its password.
+- Mnemonics and keys are never sent to any API and never written to storage unencrypted.
 
 ## Prerequisites
 - Node.js (version 18 or later)
@@ -40,35 +49,39 @@ The app will now be running locally, and you can use it securely without sending
 
 ## Usage
 
-1. Enter your mnemonic phrase in the textarea.
-2. Enter your PIN (if applicable; leave blank if none).
-3. Specify a derivation path prefix (see recommendations below).
-4. Click "Generate Addresses" to scan for used addresses with UTXOs.
-5. If UTXOs are found, review the table and click "Create Ingest Tx" to generate the transaction hex.
-6. The transaction hex and a link to view it on What's On Chain will be displayed. You can then broadcast this transaction using a BRC-100 compatible wallet.
+1. On **Wallet**, choose the preset for the wallet that created the phrase, enter the mnemonic and PIN/passphrase (leave blank if none) and click **Import / derive**.
+2. On **Recover**, click **Scan for UTXOs**. If you are not sure which wallet made the phrase, choose **Every known wallet preset**.
+3. Review the funded addresses, untick any you want to leave, and pick a destination:
+   - **Local BRC-100 wallet** — Metanet Desktop must be running. The wallet assigns the outputs and broadcasts.
+   - **Any BSV address** — build the consolidated transaction, review it, then broadcast.
+4. A link to the transaction on WhatsOnChain is shown. Results are cleared so the same coins can't be swept twice.
 
 **Warning:** Handle your mnemonic and PIN with extreme care. Exposure can lead to loss of funds. Always verify addresses and transactions before broadcasting.
 
-## Recommended Derivation Path Prefixes
+## Derivation templates
 
-This tool uses HD wallet derivation based on standards like BIP44. Here are some common prefixes in the BSV ecosystem:
+A template is a BIP32 path with `{index}` and, optionally, `{chain}` (0 = receive, 1 = change). `'` (or `h`) marks a hardened level.
 
-- **BIP44 Standard for BSV:** `m/44'/0'/0'` (coin type 0 for Bitcoin, but often used in BSV forks).
-- **Alternative BIP44 for BSV:** `m/44'/236'/0'` (using BSV-specific coin type 236).
-- **Electrum/Electron Cash Style:** `m/44'/0'/0` (non-hardened, common in some BSV wallets).
-- **HandCash/Centbee Style:** `m/0'` or `m/44'/0'/0` (check wallet-specific docs; some use custom paths).
-- **Other Common Paths:** 
-  - `m/0'/0` (simple hardened path).
-  - `m/49'/0'/0'` (for P2SH addresses, if applicable).
-  - `m/84'/0'/0'` (for native SegWit, though less common in BSV).
+| Wallet | Template |
+| --- | --- |
+| Centbee | `m/44'/0/0/{index}` |
+| RockWallet | `m/0'/0/{index}` |
+| BIP44 default, MoneyButton, Twetch | `m/44'/0'/0'/{chain}/{index}` |
+| ElectrumSV, Exodus, RelayX, Keevo | `m/44'/236'/0'/{chain}/{index}` |
+| Atomic, SimplyCash | `m/44'/145'/0'/{chain}/{index}` |
+| BIP32 basic | `m/0'/{chain}'/{index}'` |
+| Legacy prefixes from earlier versions of this tool | `m/44'/236'/0'/{index}`, `m/44'/0'/0'/{index}` |
 
-Start with `m/44'/0'/0` and try variations if no funds are found. Consult your wallet's documentation for the exact path used.
+If no funds are found, scan **Every known wallet preset**, raise the gap limit, or enter a custom template from your wallet's documentation.
 
 ## Development
-This project is built with React, TypeScript, and Vite. To build for production:
+This project is built with React, TypeScript, and Vite.
 ```
-npm run build
+npm run build      # production build
+npm run lint
+npm test           # vitest unit tests + legacy signing scripts
 ```
+Core logic lives in `src/lib` (derivation, network, token protection, transaction building, vault) and is UI-free; panels live in `src/components`.
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
