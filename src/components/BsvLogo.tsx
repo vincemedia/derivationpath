@@ -1,4 +1,4 @@
-/** The BitcoinSV mark — gold disc, white ₿ (same artwork as the BitcoinSV Wallet). */
+/** The BitcoinSV mark: gold disc, white ₿ (same artwork as the BitcoinSV Wallet). */
 export function BsvLogo({ className, darkGlyph = false }: { className?: string; darkGlyph?: boolean }) {
   return (
     <svg viewBox="0 0 2500 2500" className={className} role="img" aria-label="BitcoinSV">

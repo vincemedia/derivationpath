@@ -1,13 +1,14 @@
 // AES-GCM encrypted wallet record, keyed by PBKDF2-SHA256.
 //
-// Payload is the seed material only — mnemonic + BIP39 passphrase + where to
+// Payload is the seed material only: mnemonic + BIP39 passphrase + where to
 // look. Derived keys are reproducible from those and are never written to disk.
 
 const PBKDF2_ITER = 310_000;            // OWASP 2023 minimum for PBKDF2-SHA256
 const MAX_PBKDF2_ITER = 5_000_000;      // a hostile file must not hang the tab
 export const VAULT_FORMAT = 'mnemonic-brc100-aes-gcm-v1';
-// SatoFinder uses the same construction; its backups restore here too.
-const SATOFINDER_FORMAT = 'satofinder-aes-gcm-v2';
+// Older browser-wallet backups use the same construction with a concrete
+// path instead of a template. The format ID is fixed data inside those files.
+const LEGACY_PATH_FORMAT = 'satofinder-aes-gcm-v2';
 const LS_VAULT = 'mnemonic-brc100-vault';
 
 export interface SeedRecord {
@@ -60,8 +61,8 @@ const unharden = (s: string | undefined) => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-/** SatoFinder stores a concrete path plus a BIP44/BIP32 mode; map it to a template. */
-function fromSatoFinder(r: { mnemonic: string; passphrase?: string; path: string; mode?: string; preset?: string }): SeedRecord {
+/** Legacy backups store a concrete path plus a BIP44/BIP32 mode; map it to a template. */
+function fromLegacyPath(r: { mnemonic: string; passphrase?: string; path: string; mode?: string; preset?: string }): SeedRecord {
   const parts = r.path.split('/');
   const is32 = r.mode === '32' || (!r.mode && r.path.startsWith("m/0'"));
   if (is32) {
@@ -75,32 +76,32 @@ function fromSatoFinder(r: { mnemonic: string; passphrase?: string; path: string
 }
 
 export async function decryptVault(payload: VaultPayload, password: string): Promise<SeedRecord> {
-  if (payload?.format !== VAULT_FORMAT && payload?.format !== SATOFINDER_FORMAT) {
-    throw new Error('Unsupported or unrecognized backup format.');
+  if (payload?.format !== VAULT_FORMAT && payload?.format !== LEGACY_PATH_FORMAT) {
+    throw new Error("This isn't a backup file we recognize.");
   }
   const iterations = Number.parseInt(String(payload.iterations), 10);
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_PBKDF2_ITER) {
-    throw new Error('Backup file has an invalid key-derivation iteration count.');
+    throw new Error('This backup file looks damaged.');
   }
   const key = await vaultKey(password, b64.decode(payload.salt), iterations);
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64.decode(payload.iv) }, key, b64.decode(payload.ciphertext));
   } catch {
-    throw new Error('Wrong password, or the backup file is corrupt.');
+    throw new Error('Wrong password, or the backup file is damaged.');
   }
   const record = JSON.parse(new TextDecoder().decode(plaintext));
-  if (typeof record?.mnemonic !== 'string') throw new Error('Backup does not contain a mnemonic.');
-  return payload.format === SATOFINDER_FORMAT ? fromSatoFinder(record) : record as SeedRecord;
+  if (typeof record?.mnemonic !== 'string') throw new Error("This backup doesn't contain a seed phrase.");
+  return payload.format === LEGACY_PATH_FORMAT ? fromLegacyPath(record) : record as SeedRecord;
 }
 
 export function requireStrongPassword(password: string, confirm: string): string {
-  if (password.length < 10) throw new Error('Use a backup password of at least 10 characters.');
-  if (password !== confirm) throw new Error('Backup passwords do not match.');
+  if (password.length < 10) throw new Error('Use a password of at least 10 characters.');
+  if (password !== confirm) throw new Error("The passwords don't match.");
   return password;
 }
 
-// localStorage can throw (private mode, blocked site data) — every accessor is guarded.
+// localStorage can throw (private mode, blocked site data), so every accessor is guarded.
 export const localVault = {
   exists(): boolean {
     try { return !!localStorage.getItem(LS_VAULT); } catch { return false; }
@@ -113,7 +114,7 @@ export const localVault = {
   },
   write(payload: VaultPayload) {
     try { localStorage.setItem(LS_VAULT, JSON.stringify(payload)); }
-    catch { throw new Error('This browser blocked local storage — download the encrypted backup instead.'); }
+    catch { throw new Error("This browser won't let us save here. Download the backup file instead."); }
   },
   remove() {
     try { localStorage.removeItem(LS_VAULT); } catch { /* nothing to remove */ }

@@ -44,7 +44,7 @@ export function saveSettings(settings: Settings) {
   try {
     localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
   } catch {
-    // Storage blocked (private mode etc.) — settings still apply for this session.
+    // Storage blocked (private mode etc.); settings still apply for this session.
   }
 }
 

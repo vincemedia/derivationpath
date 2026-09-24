@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronRight, Copy, Download, Eye, EyeOff, KeyRound, Lock, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ChevronRight, Copy, Download, Eye, EyeOff, KeyRound, Lock, Repeat2, Shield, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useApp } from '../state';
 import { ENTROPY_TO_WORDS, PRESETS, generateMnemonic, presetById, templateHasChain, validateTemplate } from '../lib/derive';
 import { decryptVault, localVault } from '../lib/vault';
 import { safeInt } from '../lib/format';
 import { LOCK_IDLE_MS } from '../hooks/useAutoLock';
 import { SectionLabel, SectionTitle, Status } from './ui';
+import { PresetPicker } from './PresetPicker';
+import { OptionIcon, Select } from './Select';
+import { LabelWithInfo } from './InfoTip';
 import { useTask } from '../hooks/useTask';
 
 type CopyField = 'mnemonic' | 'wif' | 'publicKey' | 'address' | 'fingerprint';
+
+const COPY_NAMES: Record<CopyField, string> = {
+  mnemonic: 'Seed phrase', wif: 'Private key', publicKey: 'Public key', address: 'Address', fingerprint: 'Fingerprint',
+};
 
 export function WalletPanel() {
   const app = useApp();
@@ -57,17 +64,17 @@ export function WalletPanel() {
       address: selected.address, fingerprint: app.fingerprint,
     };
     const isSecret = field === 'mnemonic' || field === 'wif';
-    if (isSecret && !(await app.confirm('Copy secret to clipboard?', 'Clipboard contents may be readable by other applications, and may sync across your devices.'))) return;
+    if (isSecret && !(await app.confirm('Copy secret to clipboard?', 'Other apps can read your clipboard, and it may sync to your other devices.'))) return;
     try {
       await navigator.clipboard.writeText(values[field]);
-      task.setStatus(`${field === 'wif' ? 'Private key' : field} copied to clipboard.`, isSecret ? 'warn' : 'success');
+      task.setStatus(`${COPY_NAMES[field]} copied.`, isSecret ? 'warn' : 'success');
     } catch (e) {
-      task.setStatus(`Clipboard write failed: ${(e as Error).message}`, 'error');
+      task.setStatus(`Couldn't copy: ${(e as Error).message}`, 'error');
     }
   };
 
   const toggleReveal = async () => {
-    if (!revealed && !(await app.confirm('Reveal wallet secrets?', 'Anyone who can see your screen will be able to read your mnemonic and private key, and take the funds.'))) return;
+    if (!revealed && !(await app.confirm('Show your secrets?', 'Anyone who can see your screen can read your seed phrase and private key, and take your coins.'))) return;
     setRevealed(!revealed);
   };
 
@@ -80,26 +87,26 @@ export function WalletPanel() {
 
   return (
     <div className="card"><div className="card-body">
-      <SectionTitle title="Wallet & derivation" icon={KeyRound}>Create a new phrase or import an existing wallet, then select the exact address path.</SectionTitle>
+      <SectionTitle title="Wallet & derivation" icon={KeyRound}>Enter your seed phrase (or make a new one), then choose which address to look at.</SectionTitle>
 
       {app.lock.engaged && (
         <div className="lockbar">
           <div className="lockbar-head"><Lock size={18} aria-hidden /><strong>Wallet locked</strong><span className="mini">Locked after {app.lock.reason}.</span></div>
           <p className="mini">
             {app.vaultExists
-              ? 'Your keys were cleared from this page. Enter your backup password to restore the encrypted wallet saved in this browser.'
-              : 'Your keys were cleared from this page. No encrypted backup is saved here, so re-import your mnemonic phrase below to continue.'}
+              ? 'Your keys were wiped from this page. Enter your backup password to unlock.'
+              : 'Your keys were wiped from this page. Type your seed phrase again below to continue.'}
           </p>
           {app.vaultExists && (
             <div className="grid-2">
               <div className="field"><label htmlFor="lockPassword">Backup password</label>
-                <input id="lockPassword" type="password" autoComplete="current-password" value={lockPassword} onChange={e => setLockPassword(e.target.value)} placeholder="Password for this browser's backup" /></div>
+                <input id="lockPassword" type="password" autoComplete="current-password" value={lockPassword} onChange={e => setLockPassword(e.target.value)} placeholder="Your backup password" /></div>
               <div className="field" style={{ alignSelf: 'end' }}>
                 <button className="btn btn-primary" disabled={task.busy} onClick={() => task.run(async () => {
                   const payload = localVault.read();
-                  if (!payload) throw new Error('No encrypted backup exists in this browser.');
+                  if (!payload) throw new Error("There's no backup saved in this browser.");
                   if (!lockPassword) throw new Error('Enter your backup password.');
-                  app.restoreRecord(await decryptVault(payload, lockPassword), 'Unlocked. Wallet restored from the encrypted browser backup.');
+                  app.restoreRecord(await decryptVault(payload, lockPassword), 'Unlocked.');
                 })}>Unlock</button>
               </div>
             </div>
@@ -109,77 +116,76 @@ export function WalletPanel() {
 
       {session && !app.vaultExists && (
         <div className="status warn" style={{ margin: '0 0 22px' }}>
-          <AlertTriangle size={16} aria-hidden /><span>No encrypted backup is saved in this browser. This wallet locks after {LOCK_IDLE_MS / 60000} minutes of inactivity, and locking wipes it — you would need to re-import your phrase. Save a backup on the Backup panel to unlock with a password instead.</span>
+          <AlertTriangle size={16} aria-hidden /><span>No backup saved. After {LOCK_IDLE_MS / 60000} minutes without activity this page locks and wipes your keys, so you'd have to type your seed phrase again. Save a backup on the Backup tab to unlock with a password instead.</span>
         </div>
       )}
 
       <SectionLabel>Derivation path</SectionLabel>
       <div className="grid-2">
         <div className="field">
-          <label htmlFor="walletPreset">Wallet preset</label>
-          <select id="walletPreset" value={selection.presetId} onChange={e => applyPreset(e.target.value)}>
-            <option value="custom">Custom path</option>
-            {PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
+          <LabelWithInfo htmlFor="walletPreset" label="Wallet preset" info="Every wallet app turns your seed phrase into addresses with its own recipe. Pick the app you used and we follow the same recipe to find your coins. Not sure which? Scan every preset on the Recover tab." />
+          <PresetPicker id="walletPreset" value={selection.presetId} onChange={applyPreset} />
         </div>
         <div className="field">
-          <label htmlFor="template">Derivation template</label>
+          <LabelWithInfo htmlFor="template" label="Derivation template" info={<>The recipe, written as a path. Each number is one step from your seed to an address, and a &apos; marks an extra-private &ldquo;hardened&rdquo; step. {'{chain}'} and {'{index}'} are blanks we fill in as we walk through your addresses.</>} />
           <input id="template" value={templateDraft} spellCheck={false} onChange={e => applyTemplate(e.target.value)} />
-          <div className={`hint${templateError ? ' error-text' : ''}`}>{templateError || <>Use <code>{'{chain}'}</code> and <code>{'{index}'}</code> as placeholders. ' marks a hardened level.</>}</div>
+          <div className={`hint${templateError ? ' error-text' : ''}`}>{templateError || <><code>{'{chain}'}</code> and <code>{'{index}'}</code> fill in automatically.</>}</div>
         </div>
       </div>
 
       <div className="grid-3" style={{ marginTop: 15 }}>
-        <div className="field"><label htmlFor="chain">Chain</label>
-          <select id="chain" value={hasChain ? selection.chain : 0} disabled={!hasChain} onChange={e => app.setSelection({ ...selection, chain: safeInt(e.target.value) })}>
-            <option value={0}>0 — Receive</option><option value={1}>1 — Change</option>
-          </select></div>
-        <div className="field"><label htmlFor="addressIndex">Address index</label>
+        <div className="field"><LabelWithInfo htmlFor="chain" label="Chain" info="Wallets keep two lists of addresses. Receive (0) holds the ones you give out to get paid. Change (1) holds the ones your wallet sends leftover coins back to after you pay someone." />
+          <Select id="chain" value={String(hasChain ? selection.chain : 0)} disabled={!hasChain} onChange={v => app.setSelection({ ...selection, chain: safeInt(v) })} options={[
+            { value: '0', label: '0: Receive', detail: 'Addresses you give out', icon: <OptionIcon><ArrowDownLeft size={13} /></OptionIcon> },
+            { value: '1', label: '1: Change', detail: 'Leftovers sent back to you', icon: <OptionIcon><Repeat2 size={13} /></OptionIcon> },
+          ]} /></div>
+        <div className="field"><LabelWithInfo htmlFor="addressIndex" label="Address index" info="Which address in the list, counting from 0. Wallets hand out a fresh address each time, so #0 is your first, #1 your second, and so on." />
           <input id="addressIndex" type="number" min={0} value={selection.index} onChange={e => app.setSelection({ ...selection, index: safeInt(e.target.value) })} /></div>
-        <div className="field"><label>Derived path</label><input readOnly value={selected?.path ?? '—'} /></div>
+        <div className="field"><LabelWithInfo htmlFor="derivedPath" label="Derived path" info="The full path for the address shown below: the template with chain and index filled in. The same phrase and the same path always give the same address." /><input id="derivedPath" readOnly value={selected?.path ?? '-'} /></div>
       </div>
 
       <SectionLabel>Recovery phrase</SectionLabel>
-      <div className="field"><label htmlFor="mnemonicInput">Mnemonic phrase</label>
+      <div className="field"><label htmlFor="mnemonicInput">Seed phrase</label>
         <textarea id="mnemonicInput" autoComplete="off" autoCapitalize="none" spellCheck={false} value={mnemonic} onChange={e => setMnemonic(e.target.value)}
-          placeholder="Enter an existing 12 or 24-word BIP39 phrase, or generate a new one" />
-        <div className="hint">The phrase is processed locally. It is never sent to any API.</div></div>
+          placeholder="Type your 12 or 24 words, separated by spaces" />
+        <div className="hint">Your phrase stays in this browser. It's never sent anywhere.</div></div>
 
       <div className="grid-2" style={{ marginTop: 15 }}>
         <div className="field">
-          <label htmlFor="passphrase">PIN / BIP39 passphrase (optional)</label>
+          <LabelWithInfo htmlFor="passphrase" label="PIN / BIP39 passphrase (optional)" info="An optional extra password mixed into your seed. Leave it empty unless you set one. A different passphrase opens a completely different wallet, so a typo shows an empty wallet instead of an error." />
           <input id="passphrase" type="password" autoComplete="off" value={passphrase} onChange={e => setPassphrase(e.target.value)} placeholder="Leave empty if you never set one" />
-          <div className="hint">Centbee's PIN is this "25th word". A different passphrase derives a completely different wallet — losing it loses the funds.</div>
+          <div className="hint">Centbee users: enter your PIN here. If you lose it, you lose access to the coins.</div>
         </div>
         <div className="field">
-          <label htmlFor="wordCount">New phrase length</label>
-          <select id="wordCount" value={bits} onChange={e => setBits(safeInt(e.target.value, 256))}>
-            <option value={128}>12 words (128-bit)</option><option value={256}>24 words (256-bit)</option>
-          </select>
-          <div className="hint">Applies to "Generate new phrase" only.</div>
+          <LabelWithInfo htmlFor="wordCount" label="New phrase length" info="Only used when you generate a new phrase. 24 words is stronger than 12, but both are far beyond anyone&apos;s ability to guess. Write the words on paper, in order, and keep them offline." />
+          <Select id="wordCount" value={String(bits)} onChange={v => setBits(safeInt(v, 256))} options={[
+            { value: '128', label: '12 words', detail: 'Strong, and quicker to write down', icon: <OptionIcon><Shield size={13} /></OptionIcon> },
+            { value: '256', label: '24 words', detail: 'Strongest', icon: <OptionIcon><ShieldCheck size={13} /></OptionIcon> },
+          ]} />
+          <div className="hint">Only used for "Generate new phrase".</div>
         </div>
       </div>
 
       <div className="actions">
         <button className="btn btn-secondary" disabled={task.busy} onClick={() => task.run(() => {
           const phrase = generateMnemonic(bits);
-          app.loadWallet(phrase, passphrase, `New ${ENTROPY_TO_WORDS[bits]}-word phrase generated locally. Write it down offline — with its passphrase, if you set one — before funding this wallet.`);
+          app.loadWallet(phrase, passphrase, `New ${ENTROPY_TO_WORDS[bits]}-word phrase created. Write it on paper (plus your passphrase, if you set one) before you put any money in.`);
         })}><Sparkles size={16} /> Generate new phrase</button>
         <button className="btn btn-primary" disabled={task.busy} onClick={() => task.run(() => {
-          app.loadWallet(mnemonic, passphrase, `Wallet loaded.${passphrase ? ' A BIP39 passphrase is applied.' : ''} Secrets are hidden.`);
-        })}><Download size={16} /> Import / derive</button>
+          app.loadWallet(mnemonic, passphrase, `Wallet loaded${passphrase ? ' with your passphrase' : ''}. Your seed phrase and private key are hidden.`);
+        })}><Download size={16} /> Load wallet</button>
         <button className="btn btn-ghost" disabled={task.busy} onClick={async () => {
-          if (await app.confirm('Clear wallet?', 'This removes wallet data from the current page session. It does not delete an encrypted browser backup.')) app.clearWallet();
+          if (await app.confirm('Clear wallet?', 'This wipes the wallet from this page. A saved backup is not deleted.')) app.clearWallet();
         }}><Trash2 size={16} /> Clear wallet</button>
       </div>
 
       {session && selected && (
         <div className="key-grid">
-          {keyRow('Mnemonic', session.mnemonic, 'mnemonic', true)}
+          {keyRow('Seed phrase', session.mnemonic, 'mnemonic', true)}
           {keyRow('Private key (WIF)', selected.wif, 'wif', true)}
           {keyRow('Public key', selected.publicKey, 'publicKey')}
           {keyRow('Address', selected.address, 'address')}
-          {keyRow('Address fingerprint (SHA-256 of address + path)', app.fingerprint, 'fingerprint')}
+          {keyRow('Address fingerprint', app.fingerprint, 'fingerprint')}
           <div className="actions">
             <button className="btn btn-danger" onClick={toggleReveal}>{revealed ? <><EyeOff size={16} /> Hide secrets</> : <><Eye size={16} /> Reveal secrets</>}</button>
             <button className="btn btn-secondary" onClick={() => step(0)}><ChevronRight size={16} /> Next receive</button>

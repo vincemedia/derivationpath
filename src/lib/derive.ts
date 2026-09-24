@@ -7,27 +7,31 @@ import { HD, Mnemonic, PrivateKey, Utils } from '@bsv/sdk';
  */
 export interface Preset {
   id: string;
-  label: string;
+  /** Wallet or standard name, shown in the preset picker. */
+  name: string;
   template: string;
+  group: 'wallet' | 'standard';
+  /** File in public/wallets/, or undefined for a lettered/icon badge. */
+  icon?: string;
 }
 
 export const PRESETS: Preset[] = [
-  { id: 'centbee', label: "Centbee — m/44'/0/0/i", template: "m/44'/0/0/{index}" },
-  { id: 'rock', label: "RockWallet — m/0'/0/i", template: "m/0'/0/{index}" },
-  { id: 'bip44', label: "BIP44 default — m/44'/0'/0'/c/i", template: "m/44'/0'/0'/{chain}/{index}" },
-  { id: 'moneybutton', label: 'MoneyButton — coin type 0', template: "m/44'/0'/0'/{chain}/{index}" },
-  { id: 'twetch', label: 'Twetch — coin type 0', template: "m/44'/0'/0'/{chain}/{index}" },
-  { id: 'electrumsv', label: 'ElectrumSV — coin type 236', template: "m/44'/236'/0'/{chain}/{index}" },
-  { id: 'exodus', label: 'Exodus — coin type 236', template: "m/44'/236'/0'/{chain}/{index}" },
-  { id: 'relayx', label: 'RelayX — coin type 236', template: "m/44'/236'/0'/{chain}/{index}" },
-  { id: 'keevo', label: 'Keevo — coin type 236', template: "m/44'/236'/0'/{chain}/{index}" },
-  { id: 'atomic', label: 'Atomic — coin type 145', template: "m/44'/145'/0'/{chain}/{index}" },
-  { id: 'simplycash', label: 'SimplyCash — coin type 145', template: "m/44'/145'/0'/{chain}/{index}" },
-  { id: 'bip32', label: "BIP32 basic — m/0'/c'/i'", template: "m/0'/{chain}'/{index}'" },
+  { id: 'centbee', name: 'Centbee', group: 'wallet', icon: 'centbee.png', template: "m/44'/0/0/{index}" },
+  { id: 'rock', name: 'RockWallet', group: 'wallet', icon: 'rock.png', template: "m/0'/0/{index}" },
+  { id: 'moneybutton', name: 'MoneyButton', group: 'wallet', icon: 'moneybutton.png', template: "m/44'/0'/0'/{chain}/{index}" },
+  { id: 'twetch', name: 'Twetch', group: 'wallet', icon: 'twetch.svg', template: "m/44'/0'/0'/{chain}/{index}" },
+  { id: 'electrumsv', name: 'ElectrumSV', group: 'wallet', icon: 'electrumsv.png', template: "m/44'/236'/0'/{chain}/{index}" },
+  { id: 'exodus', name: 'Exodus', group: 'wallet', icon: 'exodus.png', template: "m/44'/236'/0'/{chain}/{index}" },
+  { id: 'relayx', name: 'RelayX', group: 'wallet', icon: 'relayx.png', template: "m/44'/236'/0'/{chain}/{index}" },
+  { id: 'keevo', name: 'Keevo', group: 'wallet', template: "m/44'/236'/0'/{chain}/{index}" },
+  { id: 'atomic', name: 'Atomic', group: 'wallet', icon: 'atomic.png', template: "m/44'/145'/0'/{chain}/{index}" },
+  { id: 'simplycash', name: 'SimplyCash', group: 'wallet', icon: 'simplycash.png', template: "m/44'/145'/0'/{chain}/{index}" },
+  { id: 'bip44', name: 'BIP44 default', group: 'standard', template: "m/44'/0'/0'/{chain}/{index}" },
+  { id: 'bip32', name: 'BIP32 basic', group: 'standard', template: "m/0'/{chain}'/{index}'" },
   // The two prefixes this tool originally shipped as "Electrum SV" and
   // "Common elsewhere". Kept so earlier recoveries remain reproducible.
-  { id: 'legacy236', label: "Legacy prefix — m/44'/236'/0'/i", template: "m/44'/236'/0'/{index}" },
-  { id: 'legacy0', label: "Legacy prefix — m/44'/0'/0'/i", template: "m/44'/0'/0'/{index}" },
+  { id: 'legacy236', name: 'Legacy prefix (coin 236)', group: 'standard', template: "m/44'/236'/0'/{index}" },
+  { id: 'legacy0', name: 'Legacy prefix (coin 0)', group: 'standard', template: "m/44'/0'/0'/{index}" },
 ];
 
 export const DEFAULT_PRESET = 'centbee';
@@ -50,16 +54,16 @@ const SEGMENT = /^(\d+|\{chain\}|\{index\})'?$/;
 export function validateTemplate(raw: string): string {
   const template = normalizeTemplate(raw);
   const parts = template.split('/');
-  if (parts[0] !== 'm') throw new Error('A derivation template must start with "m/".');
-  if (parts.length < 2) throw new Error('A derivation template needs at least one level below "m".');
+  if (parts[0] !== 'm') throw new Error('The path must start with "m/".');
+  if (parts.length < 2) throw new Error('The path needs at least one step after "m".');
   for (const p of parts.slice(1)) {
-    if (!SEGMENT.test(p)) throw new Error(`Invalid path segment "${p}". Use numbers, ' for hardened, {chain} and {index}.`);
+    if (!SEGMENT.test(p)) throw new Error(`"${p}" isn't allowed in a path. Use numbers, ', {chain} and {index}.`);
     const n = Number.parseInt(p, 10);
-    if (Number.isFinite(n) && n >= 0x80000000) throw new Error(`Path segment "${p}" is out of range.`);
+    if (Number.isFinite(n) && n >= 0x80000000) throw new Error(`"${p}" is too large for a path step.`);
   }
   const indexCount = parts.filter(p => p.startsWith('{index}')).length;
-  if (indexCount !== 1) throw new Error('A derivation template must contain {index} exactly once.');
-  if (parts.filter(p => p.startsWith('{chain}')).length > 1) throw new Error('{chain} may appear at most once.');
+  if (indexCount !== 1) throw new Error('The path needs {index} exactly once.');
+  if (parts.filter(p => p.startsWith('{chain}')).length > 1) throw new Error('The path can only use {chain} once.');
   return template;
 }
 
@@ -73,7 +77,7 @@ export const normalizeMnemonic = (text: string) => text.trim().toLowerCase().rep
 
 /**
  * The word-count assertion guards against a library silently returning less
- * entropy than asked for — a user who asks for 24 words and quietly gets 12
+ * entropy than asked for. A user who asks for 24 words and quietly gets 12
  * has a materially weaker wallet than they believe, and nothing else would notice.
  */
 export function generateMnemonic(entropyBits: number): string {
@@ -90,10 +94,10 @@ export function generateMnemonic(entropyBits: number): string {
 /** Validates a phrase and returns its normalized form. */
 export function validateMnemonic(text: string): string {
   const normalized = normalizeMnemonic(text);
-  if (!normalized) throw new Error('Enter a mnemonic phrase first.');
+  if (!normalized) throw new Error('Enter your seed phrase first.');
   const words = normalized.split(' ').length;
-  if (!VALID_WORD_COUNTS.has(words)) throw new Error(`Expected a 12, 15, 18, 21 or 24-word phrase, got ${words} words.`);
-  if (!new Mnemonic(normalized).check()) throw new Error('The mnemonic phrase is not valid (unknown word or bad checksum).');
+  if (!VALID_WORD_COUNTS.has(words)) throw new Error(`A seed phrase has 12, 15, 18, 21 or 24 words. This one has ${words}.`);
+  if (!new Mnemonic(normalized).check()) throw new Error("This seed phrase isn't valid. Check for a misspelled word or words in the wrong order.");
   return normalized;
 }
 
@@ -141,7 +145,7 @@ export function isValidAddress(address: string): boolean {
   }
 }
 
-/** A fingerprint over PUBLIC data only — hashing the mnemonic would publish a verification oracle for guessed phrases. */
+/** A fingerprint over PUBLIC data only. Hashing the mnemonic would publish a verification oracle for guessed phrases. */
 export async function addressFingerprint(address: string, path: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${address}|${path}`));
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');

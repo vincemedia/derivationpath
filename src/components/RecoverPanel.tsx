@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { WalletClient } from '@bsv/sdk';
-import { AtSign, Loader2, PenLine, ScanSearch, SearchX, Send, Wallet, X } from 'lucide-react';
+import { AtSign, Layers, Loader2, PenLine, ScanSearch, SearchX, Send, Wallet, X } from 'lucide-react';
 import { useApp } from '../state';
-import { UNIQUE_TEMPLATES, isValidAddress, templateHasChain } from '../lib/derive';
+import { UNIQUE_TEMPLATES, isValidAddress, presetById, templateHasChain } from '../lib/derive';
 import { scanForUtxos, type AddressHit } from '../lib/scan';
 import { buildP2pkhTransaction, type BuiltTx } from '../lib/tx';
 import { sweepToBrc100 } from '../lib/brc100';
@@ -10,6 +10,9 @@ import { shieldNote } from '../lib/tokens';
 import { clamp, fmtSats, fmtUsd, safeInt } from '../lib/format';
 import { Empty, SectionLabel, SectionTitle, Status, TxLink } from './ui';
 import { useTask } from '../hooks/useTask';
+import { LabelWithInfo } from './InfoTip';
+import { OptionIcon, Select } from './Select';
+import { WalletIcon } from './PresetPicker';
 
 const brc100Wallet = new WalletClient();
 
@@ -63,9 +66,9 @@ export function RecoverPanel() {
       });
       const total = summary.hits.reduce((s, h) => s + h.balance, 0);
       const utxoCount = summary.hits.reduce((s, h) => s + h.utxos.length, 0);
-      const capped = summary.cappedChains.length ? ` Stopped early at the per-chain cap on: ${summary.cappedChains.join(', ')} — raise the cap to keep looking.` : '';
+      const capped = summary.cappedChains.length ? ` Stopped at the address limit on ${summary.cappedChains.join(', ')}. Raise "Max addresses per list" to keep looking.` : '';
       scanTask.setStatus(
-        `Scan complete: checked ${summary.addressesChecked} address(es), ${summary.usedAddresses} with history. Found ${utxoCount} spendable UTXO(s), ${fmtSats(total)} sats (${fmtUsd(total, price)}).${shieldNote(summary.protectedTotal)}${capped}`,
+        `Done. Checked ${summary.addressesChecked} address(es), ${summary.usedAddresses} used before. Found ${fmtSats(total)} sats (${fmtUsd(total, price)}) in ${utxoCount} coin(s).${shieldNote(summary.protectedTotal)}${capped}`,
         utxoCount ? 'success' : 'warn');
     } finally {
       abortRef.current = null;
@@ -91,33 +94,33 @@ export function RecoverPanel() {
   };
 
   const sweepBrc100 = () => sweepTask.run(async () => {
-    if (!inputs.length) throw new Error('No UTXOs selected.');
-    if (!(await app.confirm('Sweep into your local wallet?', `This spends ${inputs.length} UTXO(s) worth ${fmtSats(chosenTotal)} sats into your BRC-100 wallet and broadcasts immediately. It is irreversible.`))) return;
+    if (!inputs.length) throw new Error('Select at least one address to move.');
+    if (!(await app.confirm('Move to your wallet?', `This moves ${fmtSats(chosenTotal)} sats into your BRC-100 wallet right away. It can't be undone.`))) return;
     const { txid, hex } = await sweepToBrc100({ api, wallet: brc100Wallet, inputs, onProgress: m => sweepTask.setStatus(m) });
-    afterSweep(txid, hex, `Swept into your BRC-100 wallet. TXID: ${txid}`);
+    afterSweep(txid, hex, `Done! Your coins are on their way to your BRC-100 wallet. Transaction ID: ${txid}`);
   });
 
   const buildToAddress = () => sweepTask.run(async () => {
     setBuilt(null);
-    if (!inputs.length) throw new Error('No UTXOs selected.');
+    if (!inputs.length) throw new Error('Select at least one address to move.');
     const dest = destAddress.trim();
-    if (!isValidAddress(dest)) throw new Error('Recovery destination is invalid.');
+    if (!isValidAddress(dest)) throw new Error("That destination address isn't valid.");
     const tx = await buildP2pkhTransaction({
       api, inputs, outputs: [], changeAddress: dest, feePerKb: settings.feePerKb,
       onProgress: m => sweepTask.setStatus(m),
     });
     setBuilt(tx);
     sweepTask.setStatus(
-      `Consolidation signed: ${inputs.length} UTXO(s), ${fmtSats(tx.totalIn)} sats in, fee ${fmtSats(tx.fee)} sats, ${fmtSats(tx.totalOut)} sats to ${dest}. Review before broadcasting.`,
+      `Ready. ${fmtSats(tx.totalOut)} sats will arrive at ${dest} after a ${fmtSats(tx.fee)}-sat fee. Check it, then press Send now.`,
       'success');
   });
 
   const broadcastToAddress = () => sweepTask.run(async () => {
-    if (!built) throw new Error('Build the recovery transaction first.');
-    if (!(await app.confirm('Broadcast recovery?', `This is irreversible. It spends ${inputs.length} UTXO(s) and sends ${fmtSats(built.totalOut)} sats to ${destAddress.trim()}.`))) return;
-    sweepTask.setStatus('Broadcasting…', 'warn');
+    if (!built) throw new Error('Prepare the transaction first.');
+    if (!(await app.confirm('Send now?', `This can't be undone. ${fmtSats(built.totalOut)} sats will go to ${destAddress.trim()}.`))) return;
+    sweepTask.setStatus('Sending…', 'warn');
     const txid = await api.woc.broadcast(built.hex);
-    afterSweep(txid, built.hex, `Recovery broadcast accepted. TXID: ${txid}`);
+    afterSweep(txid, built.hex, `Sent! Transaction ID: ${txid}`);
   });
 
   const busy = scanTask.busy || sweepTask.busy;
@@ -129,34 +132,33 @@ export function RecoverPanel() {
 
   return (
     <div className="card"><div className="card-body">
-      <SectionTitle title="Discover & recover" icon={ScanSearch}>Walk receive and change chains with a gap limit, find spendable UTXOs, and sweep them into a BRC-100 wallet or to any address.</SectionTitle>
+      <SectionTitle title="Find & recover" icon={ScanSearch}>We check your addresses one by one for coins, then move everything we find to your BRC-100 wallet or any address.</SectionTitle>
 
       <SectionLabel>Scan options</SectionLabel>
       <div className="grid-2">
         <div className="field full">
-          <label htmlFor="scanScope">Paths to scan</label>
-          <select id="scanScope" value={scope} onChange={e => setScope(e.target.value as Scope)}>
-            <option value="selected">Selected template — {selection.template}</option>
-            <option value="all">Every known wallet preset ({UNIQUE_TEMPLATES.length} templates)</option>
-          </select>
-          <div className="hint">Not sure which wallet made the phrase? Scan every preset — slower, but it finds funds on any of them.</div>
+          <LabelWithInfo htmlFor="scanScope" label="Paths to scan" info="Which recipe to use to find your addresses. &quot;Your selected path&quot; checks only the one from the Wallet tab. &quot;Every wallet we know&quot; tries them all: slower, but handy if you&apos;re not sure which app you used." />
+          <Select id="scanScope" value={scope} onChange={setScope} options={[
+            { value: 'selected', label: `Your selected path`, detail: selection.template, icon: <WalletIcon preset={presetById(selection.presetId)} /> },
+            { value: 'all', label: 'Every wallet we know', detail: `${UNIQUE_TEMPLATES.length} paths, slower`, icon: <OptionIcon><Layers size={13} /></OptionIcon> },
+          ]} />
         </div>
       </div>
       <div className="grid-3" style={{ marginTop: 16 }}>
-        <div className="field"><label htmlFor="gapLimit">Gap limit</label>
+        <div className="field"><LabelWithInfo htmlFor="gapLimit" label="Gap limit" info="Wallets use addresses in order. We keep checking until we find this many unused addresses in a row, then assume there are no more. Raise it if you think coins are further along." />
           <input id="gapLimit" type="number" min={1} max={200} value={gapLimit} onChange={e => setGapLimit(e.target.value)} />
-          <div className="hint">Consecutive unused addresses before a chain stops.</div></div>
-        <div className="field"><label htmlFor="startOffset">Start offset</label>
+          <div className="hint">Stop after this many empty addresses in a row.</div></div>
+        <div className="field"><LabelWithInfo htmlFor="startOffset" label="Start at address #" info="Where to start counting. Leave it at 0 unless you know your coins are further down the list." />
           <input id="startOffset" type="number" min={0} value={startOffset} onChange={e => setStartOffset(e.target.value)} /></div>
-        <div className="field"><label htmlFor="maxPerChain">Max per chain</label>
+        <div className="field"><LabelWithInfo htmlFor="maxPerChain" label="Max addresses per list" info="A safety limit so a scan can&apos;t run forever. Each list (receive and change) stops here, even if it keeps finding used addresses." />
           <input id="maxPerChain" type="number" min={1} max={10000} value={maxPerChain} onChange={e => setMaxPerChain(e.target.value)} /></div>
       </div>
       <label className="toggle" style={{ marginTop: 16 }}><input type="checkbox" checked={includeChange} onChange={e => setIncludeChange(e.target.checked)}
-        disabled={scope === 'selected' && !templateHasChain(selection.template)} /> Include change/internal chain</label>
+        disabled={scope === 'selected' && !templateHasChain(selection.template)} /> Also check change addresses</label>
 
       <div className="actions">
         <button className={`btn ${hasFunds ? 'btn-secondary' : 'btn-primary'}`} disabled={busy || !session} onClick={scan}>
-          {scanTask.busy ? <Loader2 size={16} className="spin" /> : <ScanSearch size={16} />} {hits.length ? 'Scan again' : 'Scan for UTXOs'}
+          {scanTask.busy ? <Loader2 size={16} className="spin" /> : <ScanSearch size={16} />} {hits.length ? 'Scan again' : 'Scan for coins'}
         </button>
         {scanTask.busy && <button className="btn btn-ghost" onClick={() => abortRef.current?.abort()}><X size={16} /> Cancel</button>}
       </div>
@@ -167,7 +169,7 @@ export function RecoverPanel() {
           <SectionLabel>Funded addresses</SectionLabel>
           <div className="table-wrap">
             <table className="utxo-table">
-              <thead><tr><th aria-label="Include" /><th>Path</th><th>Address</th><th className="num">Balance (sat)</th><th className="num">UTXOs</th><th className="num" title="Ordinal/token UTXOs left untouched">Protected</th></tr></thead>
+              <thead><tr><th aria-label="Include" /><th>Path</th><th>Address</th><th className="num">Sats</th><th className="num">Coins</th><th className="num" title="Coins holding NFTs or tokens. We leave these alone so they stay safe.">NFTs/tokens</th></tr></thead>
               <tbody>
                 {hits.map(h => (
                   <tr key={h.address} className={h.utxos.length ? '' : 'muted'}>
@@ -188,12 +190,12 @@ export function RecoverPanel() {
           </div>
         </>
       )}
-      {!scanTask.busy && hits.length === 0 && scanTask.status.type === 'warn' && <div className="result-list"><Empty icon={SearchX}>No spendable UTXOs found in the scanned window.</Empty></div>}
+      {!scanTask.busy && hits.length === 0 && scanTask.status.type === 'warn' && <div className="result-list"><Empty icon={SearchX}>No coins found at the addresses we checked.</Empty></div>}
 
       {hasFunds && (
         <div className="sweep-box">
-          <div className="label-caps">Ready to sweep</div>
-          <div className="sweep-total">{fmtSats(chosenTotal)} <small>sats · {fmtUsd(chosenTotal, price)} · {inputs.length} UTXO(s)</small></div>
+          <div className="label-caps">Ready to move</div>
+          <div className="sweep-total">{fmtSats(chosenTotal)} <small>sats · {fmtUsd(chosenTotal, price)} · {inputs.length} coin(s)</small></div>
           <div className="segmented" role="radiogroup" aria-label="Sweep destination" style={{ marginTop: 14 }}>
             <label className={destination === 'brc100' ? 'on' : ''}><input type="radio" name="dest" checked={destination === 'brc100'} onChange={() => { setDestination('brc100'); setBuilt(null); }} /><Wallet size={15} /> BRC-100 wallet</label>
             <label className={destination === 'address' ? 'on' : ''}><input type="radio" name="dest" checked={destination === 'address'} onChange={() => setDestination('address')} /><AtSign size={15} /> Any BSV address</label>
@@ -201,16 +203,16 @@ export function RecoverPanel() {
 
           {destination === 'brc100' ? (
             <>
-              <p className="mini" style={{ marginTop: 14 }}>Your BRC-100 wallet (e.g. Metanet Desktop) assigns the outputs and picks the fee. Each input is signed here with SIGHASH_ALL so the wallet cannot change the transaction, then the wallet broadcasts it.</p>
-              <div className="actions"><button className="btn btn-primary" disabled={busy} onClick={sweepBrc100}><Wallet size={16} /> Sweep into my local wallet</button></div>
+              <p className="mini" style={{ marginTop: 14 }}>Your BRC-100 wallet (like Metanet Desktop) needs to be open. It receives the coins and pays the fee. We sign everything here, so the wallet can't change where the money goes.</p>
+              <div className="actions"><button className="btn btn-primary" disabled={busy} onClick={sweepBrc100}><Wallet size={16} /> Move to my wallet</button></div>
             </>
           ) : (
             <>
-              <div className="field" style={{ marginTop: 14 }}><label htmlFor="recoveryDestination">Destination address</label>
-                <input id="recoveryDestination" spellCheck={false} value={destAddress} onChange={e => { setDestAddress(e.target.value); setBuilt(null); }} placeholder="BSV address to receive everything" /></div>
+              <div className="field" style={{ marginTop: 14 }}><LabelWithInfo htmlFor="recoveryDestination" label="Destination address" info="The BSV address that receives everything we found, minus a small network fee. Double-check it: once sent, it can&apos;t be undone." />
+                <input id="recoveryDestination" spellCheck={false} value={destAddress} onChange={e => { setDestAddress(e.target.value); setBuilt(null); }} placeholder="The BSV address that gets everything" /></div>
               <div className="actions">
-                <button className={`btn ${built ? 'btn-secondary' : 'btn-primary'}`} disabled={busy} onClick={buildToAddress}><PenLine size={16} /> Build transaction</button>
-                <button className="btn btn-ink" disabled={busy || !built} onClick={broadcastToAddress}><Send size={16} /> Broadcast</button>
+                <button className={`btn ${built ? 'btn-secondary' : 'btn-primary'}`} disabled={busy} onClick={buildToAddress}><PenLine size={16} /> Prepare transaction</button>
+                <button className="btn btn-ink" disabled={busy || !built} onClick={broadcastToAddress}><Send size={16} /> Send now</button>
               </div>
               {built && <div className="field" style={{ marginTop: 16 }}><label htmlFor="recoveryRaw">Signed transaction · <span className="mono muted">{built.txid}</span></label><textarea id="recoveryRaw" className="mono" readOnly value={built.hex} /></div>}
             </>

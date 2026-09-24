@@ -17,7 +17,7 @@ export function TokensPanel() {
   const { selected, api } = useApp();
   const [ordinals, setOrdinals] = useState<OrdinalSummary[] | null>(null);
   const [balances, setBalances] = useState<Bsv20Balance[]>([]);
-  const task = useTask('No token lookup has run.');
+  const task = useTask('Nothing looked up yet.');
 
   const address = selected?.address ?? '';
   useEffect(() => {
@@ -27,7 +27,7 @@ export function TokensPanel() {
 
   const load = () => task.run(async () => {
     if (!selected) throw new Error('Load a wallet first.');
-    task.setStatus('Querying the 1Sat overlay…');
+    task.setStatus('Looking up NFTs and tokens…');
     const [txos, bsv20] = await Promise.all([
       api.ordinals.unspent(selected.address),
       api.ordinals.bsv20Balance(selected.address).catch(() => [] as Bsv20Balance[]),
@@ -38,16 +38,16 @@ export function TokensPanel() {
     setBalances(list);
     const count = found.length + list.length;
     task.setStatus(
-      count ? `Found ${found.length} ordinal/token output(s) and ${list.length} BSV-20 balance(s) at ${selected.address}. These are excluded from every spend.`
-        : `No ordinals or BSV-20 tokens found at ${selected.address}.`,
+      count ? `Found ${found.length} NFT/token coin(s) and ${list.length} token balance(s). We'll never spend these.`
+        : `No NFTs or tokens at ${selected.address}.`,
       count ? 'success' : '');
   });
 
   return (
     <div className="card"><div className="card-body">
-      <SectionTitle title="Tokens & ordinals" icon={Gem}>Read-only view of 1Sat ordinals and BSV-20 balances at the selected address.</SectionTitle>
-      <p className="mini">These UTXOs are automatically excluded from every Send and Recovery transaction so they can never be burned as plain satoshis. Transferring them is not supported here — use a dedicated ordinals wallet.</p>
-      <div className="actions"><button className="btn btn-primary" disabled={task.busy || !selected} onClick={load}><RefreshCw size={16} /> Load tokens & ordinals</button></div>
+      <SectionTitle title="NFTs & tokens" icon={Gem}>See the NFTs (1Sat ordinals) and BSV-20 tokens at the selected address.</SectionTitle>
+      <p className="mini">We never spend these, so you can't lose them by accident. To send them, use a wallet made for NFTs and tokens.</p>
+      <div className="actions"><button className="btn btn-primary" disabled={task.busy || !selected} onClick={load}><RefreshCw size={16} /> Look up NFTs & tokens</button></div>
       <Status status={task.status} />
       {ordinals && (
         <div className="result-list">
@@ -71,7 +71,7 @@ export function TokensPanel() {
               </div>
             </div>
           ))}
-          {!ordinals.length && !balances.length && <Empty icon={Gem}>No ordinals or BSV-20 balances at this address.</Empty>}
+          {!ordinals.length && !balances.length && <Empty icon={Gem}>No NFTs or tokens at this address.</Empty>}
         </div>
       )}
     </div></div>

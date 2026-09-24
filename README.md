@@ -6,13 +6,13 @@ This tool helps recover funds from Bitcoin SV (BSV) wallets that may no longer b
 For maximum security, we strongly recommend running this tool locally on your own machine. This ensures that your mnemonic phrase and PIN never leave your device. If you use the hosted version at [mnemonic-brc100.vercel.app](https://mnemonic-brc100.vercel.app), you must trust the host (@sirdeggen on GitHub) not to capture or misuse your sensitive information. Running locally eliminates this trust requirement and is the safer option when dealing with private keys and funds recovery.
 
 ## Features
-- **Wallet & derivation** — import a 12–24 word BIP39 phrase (with optional PIN / BIP39 passphrase) or generate a new one. Pick a wallet preset (Centbee, RockWallet, BIP44, MoneyButton, Twetch, ElectrumSV, Exodus, RelayX, Keevo, Atomic, SimplyCash, BIP32) or type any template such as `m/44'/0'/0'/{chain}/{index}`. Shows address, public key, fingerprint and (behind a confirm) the WIF and mnemonic.
-- **Recover** — gap-limit discovery across receive and change chains, on one template or every known preset at once. Sweep the funded UTXOs into a local **BRC-100 wallet** (Metanet Desktop) or to **any BSV address**.
-- **Send** — build, review and broadcast a signed P2PKH transaction from the selected address, including "send entire balance".
-- **Tokens** — read-only list of 1Sat ordinals and BSV-20 balances at the selected address.
-- **History** — transactions across a window of derived addresses.
-- **Backup** — AES-GCM (PBKDF2-SHA256, 310k iterations) encrypted backup, saved in the browser or downloaded. It can also restore SatoFinder backups.
-- **Settings** — WhatsOnChain API base, explorer URL and fee rate.
+- **Wallet & derivation**: import a 12–24 word BIP39 phrase (with optional PIN / BIP39 passphrase) or generate a new one. Pick a wallet preset (Centbee, RockWallet, BIP44, MoneyButton, Twetch, ElectrumSV, Exodus, RelayX, Keevo, Atomic, SimplyCash, BIP32) or type any template such as `m/44'/0'/0'/{chain}/{index}`. Shows address, public key, fingerprint and (behind a confirm) the WIF and mnemonic.
+- **Recover**: gap-limit discovery across receive and change chains, on one template or every known preset at once. Sweep the funded UTXOs into a local **BRC-100 wallet** (Metanet Desktop) or to **any BSV address**.
+- **Send**: build, review and broadcast a signed P2PKH transaction from the selected address, including "send entire balance".
+- **Tokens**: read-only list of 1Sat ordinals and BSV-20 balances at the selected address.
+- **History**: transactions across a window of derived addresses.
+- **Backup**: AES-GCM (PBKDF2-SHA256, 310k iterations) encrypted backup, saved in the browser or downloaded.
+- **Settings**: WhatsOnChain API base, explorer URL and fee rate.
 
 ### Safety rails
 - **Ordinal/token protection:** every spend checks GorillaPool's 1Sat indexer, including BSV-20 outputs and paged results. Flagged outputs and every 1-sat output are left untouched. If the indexer is unreachable, no transaction is built.
@@ -52,8 +52,8 @@ The app will now be running locally, and you can use it securely without sending
 1. On **Wallet**, choose the preset for the wallet that created the phrase, enter the mnemonic and PIN/passphrase (leave blank if none) and click **Import / derive**.
 2. On **Recover**, click **Scan for UTXOs**. If you are not sure which wallet made the phrase, choose **Every known wallet preset**.
 3. Review the funded addresses, untick any you want to leave, and pick a destination:
-   - **Local BRC-100 wallet** — Metanet Desktop must be running. The wallet assigns the outputs and broadcasts.
-   - **Any BSV address** — build the consolidated transaction, review it, then broadcast.
+   - **Local BRC-100 wallet**: Metanet Desktop must be running. The wallet assigns the outputs and broadcasts.
+   - **Any BSV address**: build the consolidated transaction, review it, then broadcast.
 4. A link to the transaction on WhatsOnChain is shown. Results are cleared so the same coins can't be swept twice.
 
 **Warning:** Handle your mnemonic and PIN with extreme care. Exposure can lead to loss of funds. Always verify addresses and transactions before broadcasting.

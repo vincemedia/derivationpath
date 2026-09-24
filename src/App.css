@@ -1,6 +1,6 @@
 /*
  * Design tokens follow the BitcoinSV Wallet prototype: OKLCH neutrals plus
- * two brand colours — gold #FFAF00 and soft-black ink #2D2D31 on warm paper.
+ * two brand colours: gold #FFAF00 and soft-black ink #2D2D31 on warm paper.
  *   - gold  primary CTAs only. Always carries ink text (white on gold is 1.8:1).
  *   - ink   selection and state: active nav, segmented tabs, switches, focus.
  *           Flips to paper in dark mode so a selected state stays visible.
@@ -29,6 +29,7 @@
   --ring-card: color-mix(in srgb, var(--foreground) 10%, transparent);
   --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 8px 24px -12px rgb(0 0 0 / 10%);
   --radius: 0.85rem;
+  --chip-hover: #ffffff;
   --radius-xl: calc(var(--radius) * 1.4);
   --topbar-bg: color-mix(in srgb, var(--background) 82%, transparent);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -53,6 +54,7 @@
   --input: oklch(1 0 0 / 13%);
   --ring: oklch(0.8 0.004 84);
   --ring-card: oklch(1 0 0 / 8%);
+  --chip-hover: #000000;
   --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 32px -16px rgb(0 0 0 / 60%);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
@@ -90,6 +92,7 @@ svg.lucide { flex-shrink: 0; }
 .brand-logo { width: 32px; height: 32px; }
 .wordmark { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .wordmark span { font-weight: 600; opacity: 0.6; }
+.wordmark { cursor: help; border-radius: 6px; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .pill {
   display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px;
@@ -107,7 +110,7 @@ svg.lucide { flex-shrink: 0; }
 .intro { padding: 36px 2px 24px; max-width: 760px; }
 .eyebrow { color: var(--muted-foreground); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
 .intro h2 { margin: 8px 0 10px; font-size: clamp(30px, 4.4vw, 44px); font-weight: 800; line-height: 1.05; letter-spacing: -0.035em; }
-.intro p { margin: 0; color: var(--muted-foreground); font-size: 16px; }
+.intro p { margin: 0; color: var(--muted-foreground); font-size: 16px; text-wrap: balance; }
 
 .notice {
   display: flex; gap: 12px; align-items: flex-start; margin: 0 0 24px; padding: 14px 16px;
@@ -140,7 +143,8 @@ svg.lucide { flex-shrink: 0; }
   transition: background-color .15s ease;
 }
 .nav button:hover { background: var(--surface); }
-.nav .chip { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--secondary); }
+.nav button:not(.active):hover .chip { background: var(--chip-hover); }
+.nav .chip { transition: background-color .15s ease; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--secondary); }
 .nav .nav-text { display: grid; line-height: 1.25; }
 .nav .nav-label { font-weight: 600; }
 .nav .nav-caption { color: var(--muted-foreground); font-size: 12.5px; }
@@ -323,17 +327,18 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); backdrop-filter: blur(3px); }
 }
 
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: 1fr; gap: 16px; }
   .sidebar { position: static; grid-template-columns: 1fr; }
-  .sidebar .balance-block { order: 2; }
-  .nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .nav button { flex-direction: column; gap: 6px; padding: 10px 4px; text-align: center; }
-  .nav .nav-caption { display: none; }
-  .nav .nav-label { font-size: 13px; }
+  /* The bottom tab bar replaces the sidebar nav on phones and tablets. */
+  .nav-card { display: none; }
+  /* Risk notice moves below the panel, as the last card before the footer. */
+  .shell { display: flex; flex-direction: column; }
+  .shell > .notice { order: 1; margin: 16px 0 0; }
+  .shell > .footer { order: 2; }
 }
 @media (max-width: 650px) {
   .shell { width: calc(100% - 32px); }
-  .topbar .pill.network, .wordmark span { display: none; }
+  .topbar .pill.network { display: none; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .card-body { padding: 20px 16px; }
   .intro { padding-top: 20px; }
@@ -344,3 +349,164 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); backdrop-filter: blur(3px); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 textarea.mono { font-size: 12.5px; }
+
+/* Tooltip: shadcn/ui's tooltip (bg-foreground, text-background, rounded-md,
+   px-3 py-1.5 text-xs, fade + zoom-95 + 2px slide) ported from Tailwind. */
+.tooltip-content {
+  z-index: 50; max-width: 20rem; padding: 6px 12px; border-radius: calc(var(--radius) * 0.8);
+  background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: tooltip-in .15s ease-out;
+}
+.tooltip-content[data-state='closed'] { animation: tooltip-out .1s ease-in forwards; }
+.tooltip-content[data-side='bottom'] { --slide-y: -8px; }
+.tooltip-content[data-side='top'] { --slide-y: 8px; }
+.tooltip-arrow { fill: var(--foreground); }
+@keyframes tooltip-in { from { opacity: 0; transform: translateY(var(--slide-y, 0)) scale(.95); } }
+@keyframes tooltip-out { to { opacity: 0; transform: scale(.95); } }
+@media (prefers-reduced-motion: reduce) { .tooltip-content { animation: none; } }
+
+/* Popover + Command: shadcn/ui's popover (rounded-lg, bg-popover, p-2.5,
+   shadow-md, ring-foreground/10, fade + zoom-95 + 2px slide) and command
+   list, ported from Tailwind. Used by the wallet preset picker. */
+.popover-content {
+  z-index: 50; padding: 6px; border-radius: var(--radius); background: var(--card); color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--ring-card), 0 10px 30px -10px rgb(0 0 0 / 25%);
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: popover-in .1s ease-out; outline: none;
+}
+.popover-content[data-state='closed'] { animation: popover-out .1s ease-in forwards; }
+.popover-content[data-side='bottom'] { --slide-y: -8px; }
+.popover-content[data-side='top'] { --slide-y: 8px; }
+@keyframes popover-in { from { opacity: 0; transform: translateY(var(--slide-y, 0)) scale(.95); } }
+@keyframes popover-out { to { opacity: 0; transform: scale(.95); } }
+.preset-popover { width: max(var(--radix-popover-trigger-width), 320px); }
+
+.command { display: flex; flex-direction: column; }
+.command-input-wrap {
+  display: flex; align-items: center; gap: 8px; height: 38px; margin-bottom: 4px; padding: 0 10px;
+  border-radius: calc(var(--radius) * 0.8); background: var(--surface); color: var(--muted-foreground);
+}
+.command-input { flex: 1; min-height: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--foreground); font-size: 14px; }
+.command-input:focus-visible { box-shadow: none; }
+.dark .command-input { background: transparent; }
+.command-list { max-height: min(360px, var(--radix-popover-content-available-height, 360px)); overflow-y: auto; overscroll-behavior: contain; scroll-padding: 4px; }
+.command-empty { padding: 22px 0; text-align: center; font-size: 14px; color: var(--muted-foreground); }
+.command-group [cmdk-group-heading] { padding: 8px 8px 4px; color: var(--muted-foreground); font-size: 12px; font-weight: 700; }
+.command-separator { height: 1px; margin: 4px -6px; background: var(--border); }
+.command-item {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: calc(var(--radius) * 0.6);
+  font-size: 14px; cursor: pointer; user-select: none;
+}
+.command-item[data-selected='true'] { background: var(--secondary); }
+.command-item-text { display: grid; min-width: 0; line-height: 1.3; }
+.command-item-text > span:first-child { font-weight: 600; }
+.command-item-detail { color: var(--muted-foreground); font-size: 12px; font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.command-item-check { margin-left: auto; flex-shrink: 0; }
+
+/* Select-like trigger for the preset picker. */
+.select-trigger {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--input); border-radius: var(--radius); background: var(--card); text-align: left; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.dark .select-trigger { background: color-mix(in srgb, var(--input) 30%, var(--card)); }
+.select-trigger:focus-visible, .select-trigger[aria-expanded='true'] { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent); }
+.select-trigger-value { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.select-trigger-chevron { color: var(--muted-foreground); }
+
+/* Wallet logos: round, 24px, on a neutral disc so transparent marks read. */
+.wallet-icon { width: 24px; height: 24px; border-radius: 999px; flex-shrink: 0; object-fit: cover; background: var(--secondary); box-shadow: 0 0 0 1px var(--ring-card); }
+.wallet-icon-dark { background: #1d1d1f; padding: 4px; object-fit: contain; }
+.wallet-icon-letter, .wallet-icon-glyph { display: inline-grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--foreground); }
+.wallet-icon-letter { background: var(--gold); color: var(--gold-foreground); }
+
+/* (i) explainers beside form labels. */
+.label-row { display: flex; align-items: center; gap: 6px; }
+.info-btn {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--muted-foreground); cursor: help; transition: color .15s, background-color .15s;
+}
+.info-btn:hover, .info-btn[data-state='open'] { color: var(--foreground); background: var(--secondary); }
+.info-popover { width: 288px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
+.info-popover strong { display: block; margin-bottom: 4px; font-size: 13.5px; }
+.info-popover p { margin: 0; color: var(--muted-foreground); }
+.nav-tooltip { max-width: 240px; }
+
+/* Balance card: empty state steps, loading/error line, zero-balance hint. */
+.steps { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; font-weight: 600; }
+.steps li { display: flex; align-items: center; gap: 10px; }
+.step-num {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 999px;
+  background: var(--secondary); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.balance-state { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--muted-foreground); font-weight: 600; }
+.balance-hint { margin: 10px 0 0; color: var(--muted-foreground); font-size: 13px; text-wrap: pretty; }
+
+/* Generic popover select (Select.tsx): same list styling as the preset combobox. */
+.select-popover { width: var(--radix-popover-trigger-width); min-width: 240px; }
+.select-option { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; }
+.select-option:hover, .select-option:focus-visible { background: var(--secondary); outline: none; }
+.select-option-detail { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.select-trigger:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ── Collapsible risk notice (collapsed on phones only) ── */
+.notice-toggle { display: none; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* ── Bottom tab bar (phones/tablets) ──────────────────── */
+.tabbar { display: none; }
+@media (max-width: 900px) {
+  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter: saturate(1.4) blur(16px);
+    box-shadow: 0 -1px 0 var(--ring-card), 0 -8px 24px -16px rgb(0 0 0 / 20%);
+  }
+  .tab {
+    display: grid; justify-items: center; gap: 3px; min-height: 56px; padding: 4px 0; border: 0; background: none;
+    color: var(--muted-foreground); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .tab-icon { display: grid; place-items: center; width: 52px; height: 30px; border-radius: 999px; transition: background-color .2s ease, color .2s ease; }
+  .tab-label { font-size: 11.5px; font-weight: 700; line-height: 1.2; }
+  .tab.active { color: var(--foreground); }
+  .tab.active .tab-icon { background: var(--ink); color: var(--ink-foreground); }
+  .tab:active .tab-icon { transform: scale(.94); }
+  .more-popover { width: min(300px, calc(100vw - 24px)); }
+  .select-option.current { background: var(--secondary); }
+  .more-icon { width: 32px; height: 32px; }
+}
+
+@media (max-width: 650px) {
+  .intro { padding: 16px 2px 14px; }
+  .intro h2 { font-size: 28px; margin: 0; }
+  .intro p { display: none; }
+  .notice { margin-bottom: 16px; padding: 10px 14px; font-size: 13.5px; }
+  .notice:not(.open) .notice-more { display: none; }
+  .notice-toggle { display: inline; }
+
+  /* Balance becomes a slim strip above the panel. */
+  .balance-block { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .balance-block > .label-caps, .balance-path, .balance-hint { display: none; }
+  .balance-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; flex: 1; }
+  .balance-sats { margin: 0; font-size: 20px; }
+  .balance-sats small { font-size: 13px; }
+  .balance-usd { margin: 0; font-size: 13px; }
+  .balance-state { margin: 0; font-size: 13.5px; }
+  .balance-block .actions { margin: 0; flex-wrap: nowrap; }
+  .balance-block .actions .btn { flex: 0 0 auto; }
+  .balance-actions .btn-secondary { width: 34px; padding: 0; }
+  .balance-actions .btn-secondary .btn-text, .balance-actions .btn-primary .btn-text { display: none; }
+
+  /* Empty state: the three steps as one compact row; the Wallet tab is already open. */
+  .balance-empty .steps { display: flex; gap: 6px 12px; margin: 0; flex-wrap: wrap; font-size: 13px; }
+  .balance-empty .steps li { gap: 6px; }
+  .balance-empty .step-num { width: 20px; height: 20px; font-size: 11px; }
+  .balance-empty .balance-cta { display: none; }
+}
+
+/* Dev-only Agentation toolbar: sit above the mobile tab bar, not on top of More. */
+@media (max-width: 900px) {
+  .agentation-dev { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+}

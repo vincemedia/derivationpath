@@ -1,7 +1,7 @@
 import type { Api, OrdinalTxo } from './net';
 
 // Every spend MUST run its UTXOs through protectedSet() before building. A
-// 1-sat ordinal or a BSV-20-bearing UTXO spent as a plain sat is burned — paid
+// 1-sat ordinal or a BSV-20-bearing UTXO spent as a plain sat is burned: paid
 // to fee or folded into change. Recovery users are exactly the people most
 // likely to have stray ordinals at deep derivation paths.
 //
@@ -27,7 +27,7 @@ export async function protectedSet(api: Api, address: string): Promise<Set<strin
   try {
     raw = await api.ordinals.unspent(address);
   } catch (e) {
-    throw new Error(`Ordinal/token indexer unavailable (${(e as Error).message}). Refusing to build a transaction — cannot verify these UTXOs are safe to spend.`);
+    throw new Error(`Couldn't reach the NFT/token check (${(e as Error).message}). To keep your NFTs and tokens safe, nothing was sent. Try again in a moment.`);
   }
   const set = new Set<string>();
   for (const txo of raw) if (isProtectedTxo(txo)) set.add(outpointKey(txo.txid, txo.vout));
@@ -51,7 +51,7 @@ export function filterSpendable<T extends Spendable>(utxos: T[], protectedOutpoi
   return { spendable, protectedCount };
 }
 
-export const shieldNote = (n: number) => n ? ` ${n} ordinal/token UTXO(s) excluded and left untouched.` : '';
+export const shieldNote = (n: number) => n ? ` ${n} coin(s) holding NFTs or tokens were left alone so they stay safe.` : '';
 
 export interface OrdinalSummary {
   outpoint: string;

@@ -25,7 +25,7 @@ export function useAutoLock(active: boolean, onLock: (reason: string) => void, b
     };
     const armIdle = () => {
       clearTimeout(idle);
-      idle = setTimeout(() => fire(`${LOCK_IDLE_MS / 60000} minutes of inactivity`), LOCK_IDLE_MS);
+      idle = setTimeout(() => fire(`${LOCK_IDLE_MS / 60000} minutes without activity`), LOCK_IDLE_MS);
     };
     const onVisibility = () => {
       clearTimeout(hidden);

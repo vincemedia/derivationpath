@@ -43,7 +43,7 @@ export async function request(url: string, options: RequestInit = {}): Promise<u
   try {
     response = await fetch(url, options);
   } catch (e) {
-    throw new Error(`Network request failed (${(e as Error).message}).`);
+    throw new Error(`Couldn't connect (${(e as Error).message}). Check your internet connection.`);
   }
   const raw = await response.text();
   let data: unknown;
@@ -75,7 +75,7 @@ export async function withRetry<T>(fn: () => Promise<T>, label: string, attempts
       await sleep(400 * 2 ** (attempt - 1));   // 400, 800, 1600 ms
     }
   }
-  throw new Error(`${label} failed after ${attempts} attempts: ${(lastError as Error).message}`);
+  throw new Error(`${label} failed after ${attempts} tries: ${(lastError as Error).message}`);
 }
 
 export interface WocUtxo {
@@ -124,12 +124,12 @@ export function createApi(settings: Settings) {
     const out: OrdinalTxo[] = [];
     for (let page = 0; page < ORDINALS_MAX_PAGES; page++) {
       const url = `${ORDINALS_API}/txos/address/${enc(address)}/unspent?bsv20=${bsv20}&limit=${ORDINALS_PAGE}&offset=${page * ORDINALS_PAGE}`;
-      const batch = await withRetry(() => request(url), `Ordinal indexer lookup for ${address}`);
-      if (!Array.isArray(batch)) throw new Error('Ordinal indexer returned an unexpected shape.');
+      const batch = await withRetry(() => request(url), `NFT/token check for ${address}`);
+      if (!Array.isArray(batch)) throw new Error('The NFT/token check sent back something unexpected.');
       out.push(...batch as OrdinalTxo[]);
       if (batch.length < ORDINALS_PAGE) return out;
     }
-    throw new Error(`Address ${address} holds more than ${ORDINALS_PAGE * ORDINALS_MAX_PAGES} indexed outputs — too many to verify.`);
+    throw new Error(`Address ${address} has more than ${ORDINALS_PAGE * ORDINALS_MAX_PAGES} NFT/token records, too many to check safely.`);
   }
 
   return {
@@ -138,9 +138,9 @@ export function createApi(settings: Settings) {
 
       /** Unspent outputs, minus any already spent by a mempool transaction. */
       unspent: async (a: string): Promise<WocUtxo[]> => {
-        const data = await woc<{ result?: WocUtxo[] } | WocUtxo[]>(`/address/${enc(a)}/unspent/all`, `UTXO lookup for ${a}`);
+        const data = await woc<{ result?: WocUtxo[] } | WocUtxo[]>(`/address/${enc(a)}/unspent/all`, `Coin lookup for ${a}`);
         const rows = Array.isArray(data) ? data : data?.result;
-        if (!Array.isArray(rows)) throw new Error(`Unexpected UTXO response for ${a}.`);
+        if (!Array.isArray(rows)) throw new Error(`Got an unexpected answer about the coins at ${a}.`);
         return rows.filter(u => !u.isSpentInMempoolTx);
       },
 
@@ -148,7 +148,7 @@ export function createApi(settings: Settings) {
         try {
           const data = await woc<WocHistoryRow[] | { result?: WocHistoryRow[] }>(`/address/${enc(a)}/history`, `History lookup for ${a}`);
           const rows = Array.isArray(data) ? data : data?.result;
-          if (!Array.isArray(rows)) throw new Error(`Unexpected history response for ${a}.`);
+          if (!Array.isArray(rows)) throw new Error(`Got an unexpected answer about the history of ${a}.`);
           return rows;
         } catch (e) {
           if (/\b404\b|not found/i.test((e as Error).message)) return [];   // unused address
@@ -159,14 +159,14 @@ export function createApi(settings: Settings) {
       price: () => woc<{ rate: number; currency?: string }>('/exchangerate', 'Exchange rate lookup'),
 
       txHex: async (txid: string): Promise<string> => {
-        const data = await woc<unknown>(`/tx/${enc(txid)}/hex`, `Source transaction ${txid}`);
-        if (typeof data !== 'string' || !/^[0-9a-f]+$/i.test(data.trim())) throw new Error(`Unexpected transaction response for ${txid}.`);
+        const data = await woc<unknown>(`/tx/${enc(txid)}/hex`, `Transaction ${txid}`);
+        if (typeof data !== 'string' || !/^[0-9a-f]+$/i.test(data.trim())) throw new Error(`Got an unexpected answer about transaction ${txid}.`);
         return data.trim();
       },
 
       beefHex: async (txid: string): Promise<string> => {
-        const data = await woc<unknown>(`/tx/${enc(txid)}/beef`, `BEEF for ${txid}`);
-        if (typeof data !== 'string' || !/^[0-9a-f]+$/i.test(data.trim())) throw new Error(`Unexpected BEEF response for ${txid}.`);
+        const data = await woc<unknown>(`/tx/${enc(txid)}/beef`, `Coin details for ${txid}`);
+        if (typeof data !== 'string' || !/^[0-9a-f]+$/i.test(data.trim())) throw new Error(`Got an unexpected answer about transaction ${txid}.`);
         return data.trim();
       },
 
@@ -192,7 +192,7 @@ export function createApi(settings: Settings) {
         return [...plain, ...tokens];
       },
       bsv20Balance: (a: string) =>
-        withRetry(() => request(`${ORDINALS_API}/bsv20/${enc(a)}/balance`), `BSV-20 lookup for ${a}`) as Promise<Bsv20Balance[]>,
+        withRetry(() => request(`${ORDINALS_API}/bsv20/${enc(a)}/balance`), `Token lookup for ${a}`) as Promise<Bsv20Balance[]>,
     },
   };
 }

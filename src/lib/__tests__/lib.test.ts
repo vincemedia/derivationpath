@@ -38,7 +38,7 @@ describe('derivation', () => {
 
   it('normalizes and rejects bad phrases', () => {
     expect(validateMnemonic(`  ${ABANDON.toUpperCase()}  `)).toBe(ABANDON);
-    expect(() => validateMnemonic(ABANDON.replace('about', 'abandon'))).toThrow(/checksum/);
+    expect(() => validateMnemonic(ABANDON.replace('about', 'abandon'))).toThrow(/isn't valid/);
     expect(() => validateMnemonic('abandon abandon')).toThrow(/12, 15, 18, 21 or 24/);
   });
 
@@ -47,7 +47,7 @@ describe('derivation', () => {
     expect(resolvePath("m/0'/{chain}'/{index}'", 1, 7)).toBe("m/0'/1'/7'");
     expect(() => validateTemplate("m/44'/0'/0'")).toThrow(/\{index\}/);
     expect(() => validateTemplate("44'/0/{index}")).toThrow(/start with/);
-    expect(() => validateTemplate('m/abc/{index}')).toThrow(/Invalid path segment/);
+    expect(() => validateTemplate('m/abc/{index}')).toThrow(/isn't allowed in a path/);
     for (const p of PRESETS) expect(validateTemplate(p.template)).toBe(p.template);
   });
 
@@ -88,9 +88,9 @@ describe('vault', () => {
     await expect(decryptVault(payload, 'wrong password!!')).rejects.toThrow(/Wrong password/);
   });
 
-  it('restores SatoFinder backups into templates', async () => {
-    const sato = { mnemonic: ABANDON, passphrase: '', path: "m/44'/236'/0'/1/9", preset: 'exodus', mode: '44' };
-    const payload = { ...(await encryptVault(sato as unknown as SeedRecord, 'correct horse battery')), format: 'satofinder-aes-gcm-v2' };
+  it('restores legacy path backups into templates', async () => {
+    const legacy = { mnemonic: ABANDON, passphrase: '', path: "m/44'/236'/0'/1/9", preset: 'exodus', mode: '44' };
+    const payload = { ...(await encryptVault(legacy as unknown as SeedRecord, 'correct horse battery')), format: 'satofinder-aes-gcm-v2' };
     expect(await decryptVault(payload, 'correct horse battery')).toMatchObject({
       template: "m/44'/236'/0'/{chain}/{index}", chain: 1, index: 9,
     });
@@ -98,8 +98,8 @@ describe('vault', () => {
 
   it('refuses hostile iteration counts and unknown formats', async () => {
     const payload = await encryptVault(record, 'correct horse battery');
-    await expect(decryptVault({ ...payload, iterations: 1e9 }, 'x')).rejects.toThrow(/iteration/);
-    await expect(decryptVault({ ...payload, format: 'nope' }, 'x')).rejects.toThrow(/format/);
+    await expect(decryptVault({ ...payload, iterations: 1e9 }, 'x')).rejects.toThrow(/damaged/);
+    await expect(decryptVault({ ...payload, format: 'nope' }, 'x')).rejects.toThrow(/recognize/);
   });
 
   it('enforces password rules', () => {
@@ -158,7 +158,7 @@ describe('transaction building', () => {
     await expect(buildP2pkhTransaction({
       api, inputs: [{ txid, vout: 0, satoshis: 900_000, address, privateKey: key }],
       outputs: [], changeAddress: dest, feePerKb: 100,
-    })).rejects.toThrow(/not 900000/);
+    })).rejects.toThrow(/not the 900000/);
   });
 
   it('refuses to spend a non-plain (inscription) output', async () => {
@@ -167,7 +167,7 @@ describe('transaction building', () => {
     await expect(buildP2pkhTransaction({
       api, inputs: [{ txid, vout: 0, satoshis: 5_000, address, privateKey: key }],
       outputs: [], changeAddress: dest, feePerKb: 100,
-    })).rejects.toThrow(/not a plain P2PKH/);
+    })).rejects.toThrow(/isn't a plain payment/);
   });
 
   it('reports insufficient funds instead of underpaying the fee', async () => {
@@ -175,7 +175,7 @@ describe('transaction building', () => {
     await expect(buildP2pkhTransaction({
       api, inputs: [{ txid, vout: 0, satoshis: 1_000, address, privateKey: key }],
       outputs: [{ address: dest, satoshis: 999 }], changeAddress: address, feePerKb: 100,
-    })).rejects.toThrow(/Insufficient funds/);
+    })).rejects.toThrow(/Not enough funds/);
   });
 });
 
@@ -204,6 +204,6 @@ describe('gap-limit scan', () => {
 
     const failing = { ...api, ordinals: { unspent: async () => { throw new Error('503'); } } } as unknown as Api;
     await expect(scanForUtxos({ api: failing, root, templates: [template], includeChange: false, gapLimit: 3, startOffset: 0, maxPerChain: 100 }))
-      .rejects.toThrow(/Refusing to build/);
+      .rejects.toThrow(/nothing was sent/);
   });
 });

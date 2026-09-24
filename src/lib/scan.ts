@@ -67,7 +67,7 @@ export async function scanForUtxos(opts: ScanOptions): Promise<ScanSummary> {
       let index = opts.startOffset;
       let scanned = 0;
       while (consecutiveUnused < opts.gapLimit) {
-        if (signal?.aborted) throw new Error('Scan cancelled.');
+        if (signal?.aborted) throw new Error('Scan stopped.');
         if (scanned >= opts.maxPerChain) {
           cappedChains.push(`${template} chain ${chain}`);
           break;
@@ -78,7 +78,7 @@ export async function scanForUtxos(opts: ScanOptions): Promise<ScanSummary> {
         if (seen.has(key.address)) continue;
         seen.add(key.address);
         addressesChecked++;
-        onProgress?.(`Checking ${key.path} — ${key.address}`);
+        onProgress?.(`Checking ${key.path}: ${key.address}`);
 
         const history = await api.woc.history(key.address);
         if (!history.length) {
