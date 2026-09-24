@@ -5,6 +5,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export interface SelectOption<T extends string> {
   value: T;
   label: string;
+  /** Optional bold name shown before the label, e.g. the active wallet. */
+  prefix?: string;
   /** Optional second line, e.g. what the option means. */
   detail?: string;
   icon?: ReactNode;
@@ -47,7 +49,7 @@ export function Select<T extends string>({ id, value, options, onChange, disable
       <PopoverTrigger asChild>
         <button id={id} type="button" role="combobox" aria-expanded={open} aria-haspopup="listbox" className="select-trigger" disabled={disabled}>
           {current.icon}
-          <span className="select-trigger-value">{current.label}</span>
+          <span className="select-trigger-value">{current.prefix ? <><b>{current.prefix}</b> <span className="select-prefixed">{current.label}</span></> : current.label}</span>
           <ChevronsUpDown size={16} className="select-trigger-chevron" aria-hidden />
         </button>
       </PopoverTrigger>
@@ -65,7 +67,7 @@ export function Select<T extends string>({ id, value, options, onChange, disable
             <button key={o.value} type="button" role="option" aria-selected={o.value === value} className="command-item select-option" onClick={() => pick(o.value)}>
               {o.icon}
               <span className="command-item-text">
-                <span>{o.label}</span>
+                <span>{o.prefix ? <><b>{o.prefix}</b> <span className="select-prefixed">{o.label}</span></> : o.label}</span>
                 {o.detail && <span className="select-option-detail">{o.detail}</span>}
               </span>
               <Check size={16} className="command-item-check" style={{ opacity: o.value === value ? 1 : 0 }} aria-hidden />

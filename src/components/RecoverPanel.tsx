@@ -139,7 +139,7 @@ export function RecoverPanel() {
         <div className="field full">
           <LabelWithInfo htmlFor="scanScope" label="Paths to scan" info="Which recipe to use to find your addresses. &quot;Your selected path&quot; checks only the one from the Wallet tab. &quot;Every wallet we know&quot; tries them all: slower, but handy if you&apos;re not sure which app you used." />
           <Select id="scanScope" value={scope} onChange={setScope} options={[
-            { value: 'selected', label: `Your selected path`, detail: selection.template, icon: <WalletIcon preset={presetById(selection.presetId)} /> },
+            { value: 'selected', prefix: presetById(selection.presetId)?.name ?? 'Custom', label: 'Your selected path', detail: selection.template, icon: <WalletIcon preset={presetById(selection.presetId)} /> },
             { value: 'all', label: 'Every wallet we know', detail: `${UNIQUE_TEMPLATES.length} paths, slower`, icon: <OptionIcon><Layers size={13} /></OptionIcon> },
           ]} />
         </div>

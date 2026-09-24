@@ -510,3 +510,6 @@ textarea.mono { font-size: 12.5px; }
 @media (max-width: 900px) {
   .agentation-dev { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
 }
+
+/* Bold name before a select label (e.g. the active wallet), then the label muted. */
+.select-prefixed { color: var(--muted-foreground); font-weight: 600; }
