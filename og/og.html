@@ -14,8 +14,10 @@ body::before { content: ''; position: absolute; inset: 0; background: radial-gra
 h1 { position: absolute; left: 663px; top: 58px; width: 470px; font-size: 56px; font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; }
 .tile { position: absolute; height: 76px; border-radius: 16px; background: #38383d; }
 .bar { position: absolute; height: 88px; width: 470px; border-radius: 16px; display: flex; align-items: center; padding-left: 40px;
-        font-size: 29px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums lining-nums;
+        gap: 16px; padding-left: 22px; font-size: 29px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums lining-nums;
         box-shadow: 0 18px 40px -18px rgba(0,0,0,.55); transform-origin: center; }
+.wallet { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; object-fit: cover; background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 4px 10px -4px rgba(0,0,0,.35); }
+.wallet.dark { background: #1d1d1f; padding: 9px; object-fit: contain; }
 .gold  { background: #ffaf00; color: #2d2d31; }
 .paper { background: #f4f2f0; color: #2d2d31; }
 .soft  { background: #ffe4a8; color: #8a5a00; }
@@ -37,8 +39,8 @@ h1 { position: absolute; left: 663px; top: 58px; width: 470px; font-size: 56px; 
   <div class="tile" style="left:228px; top:563px; width:310px"></div>
   <div class="tile" style="left:1133px; top:563px; width:120px"></div>
 
-  <div class="bar gold"  style="left:80px;  top:348px; transform: rotate(-10deg)">m/44'/0'/0'/0/0</div>
-  <div class="bar paper" style="left:533px; top:406px; transform: rotate(7deg)">m/44'/236'/0'/1/7</div>
-  <div class="bar soft"  style="left:208px; top:466px; transform: rotate(4deg)">m/44'/0/0/12</div>
-  <div class="bar deep"  style="left:612px; top:564px; transform: rotate(0deg)">m/0'/0/3</div>
+  <div class="bar gold"  style="left:80px;  top:348px; transform: rotate(-10deg)"><img class="wallet dark" src="../public/wallets/twetch.svg" alt="Twetch"><span>m/44'/0'/0'/0/0</span></div>
+  <div class="bar paper" style="left:533px; top:406px; transform: rotate(7deg)"><img class="wallet" src="../public/wallets/exodus.png" alt="Exodus"><span>m/44'/236'/0'/1/7</span></div>
+  <div class="bar soft"  style="left:208px; top:466px; transform: rotate(4deg)"><img class="wallet" src="../public/wallets/centbee.png" alt="Centbee"><span>m/44'/0/0/12</span></div>
+  <div class="bar deep"  style="left:612px; top:564px; transform: rotate(0deg)"><img class="wallet" src="../public/wallets/rock.png" alt="RockWallet"><span>m/0'/0/3</span></div>
 </body></html>
