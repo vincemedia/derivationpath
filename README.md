@@ -1,68 +1,81 @@
-# Mnemonic to BRC-100
+# Derivation Path
 
-This tool helps recover funds from Bitcoin SV (BSV) wallets that may no longer be online by deriving addresses from a mnemonic phrase, checking for unspent transaction outputs (UTXOs), and creating an ingest transaction compatible with BRC-100 wallets.
+![Derivation Path: Recover BSV from any seed phrase](public/og.png)
 
-**Important Security Note:**  
-For maximum security, we strongly recommend running this tool locally on your own machine. This ensures that your mnemonic phrase and PIN never leave your device. If you use a hosted copy, you must trust whoever runs it not to capture or misuse your sensitive information. Running locally eliminates this trust requirement and is the safer option when dealing with private keys and funds recovery.
+**Recover BSV from any seed phrase.** Derivation Path finds every address a wallet ever used, shows what's still on them, and moves those coins into a [BRC-100](https://brc.dev/100) wallet (like Metanet Desktop) or to any BSV address. It runs entirely in your browser.
+
+It's built for wallets that no longer work or no longer exist, such as Centbee, RockWallet, MoneyButton and Twetch, where the coins are still on the blockchain but the app to spend them is gone.
+
+> [!WARNING]
+> Use at your own risk. This software is provided **as is**, without warranty, and the authors accept no liability for any loss. Read the [Terms of Use](TERMS.md) before using it.
+
+## Contents
+
+- [Why a derivation path matters](#why-a-derivation-path-matters)
+- [Features](#features)
+- [Run it locally](#run-it-locally)
+- [How to recover your coins](#how-to-recover-your-coins)
+- [Supported wallets](#supported-wallets)
+- [Security and privacy](#security-and-privacy)
+- [Development](#development)
+- [Terms of Use and disclaimer](#terms-of-use-and-disclaimer)
+- [License](#license)
+
+## Why a derivation path matters
+
+A seed phrase doesn't hold coins directly. Each wallet app follows its own recipe, a **derivation path** such as `m/44'/0'/0'/0/0`, to turn the phrase into a list of addresses. The same phrase gives completely different addresses under different paths, so an app that uses the wrong path shows an empty wallet even when the coins are there. Derivation Path knows the recipes of common BSV wallets and can try all of them.
 
 ## Features
-- **Wallet & derivation**: import a 12–24 word BIP39 phrase (with optional PIN / BIP39 passphrase) or generate a new one. Pick a wallet preset (Centbee, RockWallet, BIP44, MoneyButton, Twetch, ElectrumSV, Exodus, RelayX, Keevo, Atomic, SimplyCash, BIP32) or type any template such as `m/44'/0'/0'/{chain}/{index}`. Shows address, public key, fingerprint and (behind a confirm) the WIF and mnemonic.
-- **Recover**: gap-limit discovery across receive and change chains, on one template or every known preset at once. Sweep the funded UTXOs into a local **BRC-100 wallet** (Metanet Desktop) or to **any BSV address**.
-- **Send**: build, review and broadcast a signed P2PKH transaction from the selected address, including "send entire balance".
-- **Tokens**: read-only list of 1Sat ordinals and BSV-20 balances at the selected address.
-- **History**: transactions across a window of derived addresses.
-- **Backup**: AES-GCM (PBKDF2-SHA256, 310k iterations) encrypted backup, saved in the browser or downloaded.
-- **Settings**: WhatsOnChain API base, explorer URL and fee rate.
 
-### Safety rails
-- **Ordinal/token protection:** every spend checks GorillaPool's 1Sat indexer, including BSV-20 outputs and paged results. Flagged outputs and every 1-sat output are left untouched. If the indexer is unreachable, no transaction is built.
-- **Source verification:** before signing, each input's source transaction is checked to be a plain P2PKH output of the reported value to the derived address, so an inscription or a misreported amount is refused.
-- **Fail closed:** API calls are rate-limited and retried; a scan that can't reach the API aborts instead of reporting a partial result as complete.
-- **Auto-lock:** keys are wiped after 10 minutes idle or 60 seconds with the tab hidden. With a browser backup saved, unlock with its password.
-- Mnemonics and keys are never sent to any API and never written to storage unencrypted.
+| | |
+| --- | --- |
+| **Wallet** | Load a 12 to 24 word BIP39 phrase, with an optional PIN or passphrase, or generate a new one. Pick the wallet app it came from or type any path. |
+| **Recover** | Walk receive and change addresses until a run of unused ones (the gap limit), on one path or every known wallet at once. Move what it finds into a BRC-100 wallet or to any address. |
+| **Send** | Pay from the selected address, or send everything on it. You review the transaction before it goes out. |
+| **Tokens** | See 1Sat ordinals (NFTs) and BSV-20 tokens at an address. They are never spent by accident. |
+| **History** | List past transactions across your addresses. |
+| **Backup** | Save your phrase encrypted with a password (AES-GCM, PBKDF2-SHA256 with 310,000 iterations), in the browser or as a file. |
+| **Settings** | Choose the blockchain data source, the transaction link and the network fee. |
 
-## Prerequisites
-- Node.js (version 18 or later)
-- npm (comes with Node.js)
+The interface works on phones (bottom tab bar), has a light and dark theme, and explains every field in plain language.
 
-## Installation and Running Locally
+## Run it locally
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/vincemedia/derivationpath.git
-   cd derivationpath
-   ```
+Running it on your own computer is the safest way to use it: you don't have to trust anyone hosting a copy. You need [Node.js](https://nodejs.org) 20 or later.
 
-2. Install dependencies:
-   ```
-   npm install
-   ```
+```bash
+git clone https://github.com/vincemedia/derivationpath.git
+cd derivationpath
+npm install
+npm run dev
+```
 
-3. Start the development server:
-   ```
-   npm run dev
-   ```
+Then open http://localhost:5173.
 
-4. Open your browser and navigate to `http://localhost:5173` (or the port shown in the terminal).
+To serve a production build instead:
 
-The app will now be running locally, and you can use it securely without sending data to any external servers.
+```bash
+npm run build
+npm run preview    # http://localhost:4173
+```
 
-## Usage
+## How to recover your coins
 
-1. On **Wallet**, choose the preset for the wallet that created the phrase, enter the mnemonic and PIN/passphrase (leave blank if none) and click **Import / derive**.
-2. On **Recover**, click **Scan for UTXOs**. If you are not sure which wallet made the phrase, choose **Every known wallet preset**.
-3. Review the funded addresses, untick any you want to leave, and pick a destination:
-   - **Local BRC-100 wallet**: Metanet Desktop must be running. The wallet assigns the outputs and broadcasts.
-   - **Any BSV address**: build the consolidated transaction, review it, then broadcast.
-4. A link to the transaction on WhatsOnChain is shown. Results are cleared so the same coins can't be swept twice.
+1. **Wallet tab:** choose the wallet app that created the phrase, type the phrase and its PIN or passphrase (leave it empty if you never set one), then press **Load wallet**.
+2. **Recover tab:** press **Scan for coins**. Not sure which app you used? Pick **Every wallet we know** under "Paths to scan".
+3. **Review:** the table lists every address with coins. Untick any you want to leave.
+4. **Move the coins:**
+   - **BRC-100 wallet:** open Metanet Desktop first, then press **Move to my wallet**. Your wallet chooses where the coins land and pays the fee; each input is signed in your browser, so the wallet can't change where the money goes.
+   - **Any BSV address:** paste the address, press **Prepare transaction**, check the amounts, then press **Send now**.
+5. A link to the transaction appears. The results are cleared so the same coins can't be moved twice.
 
-**Warning:** Handle your mnemonic and PIN with extreme care. Exposure can lead to loss of funds. Always verify addresses and transactions before broadcasting.
+Found nothing? Try **Every wallet we know**, raise the gap limit, or check your old wallet's documentation for its path and type it in.
 
-## Derivation templates
+## Supported wallets
 
-A template is a BIP32 path with `{index}` and, optionally, `{chain}` (0 = receive, 1 = change). `'` (or `h`) marks a hardened level.
+A path template uses `{index}` for the address number and, optionally, `{chain}` for the list (0 = receive, 1 = change). `'` marks a hardened step.
 
-| Wallet | Template |
+| Wallet | Path template |
 | --- | --- |
 | Centbee | `m/44'/0/0/{index}` |
 | RockWallet | `m/0'/0/{index}` |
@@ -72,22 +85,49 @@ A template is a BIP32 path with `{index}` and, optionally, `{chain}` (0 = receiv
 | BIP32 basic | `m/0'/{chain}'/{index}'` |
 | Legacy prefixes from earlier versions of this tool | `m/44'/236'/0'/{index}`, `m/44'/0'/0'/{index}` |
 
-If no funds are found, scan **Every known wallet preset**, raise the gap limit, or enter a custom template from your wallet's documentation.
+Any other BIP32 path can be typed in as a custom template.
+
+## Security and privacy
+
+**Your keys stay in your browser.** The seed phrase, passphrase and private keys are never sent to any server and never saved unencrypted. Only public data leaves the page: addresses and signed transactions go to [WhatsOnChain](https://whatsonchain.com) for balances, history and broadcasting, and addresses go to [GorillaPool](https://ordinals.gorillapool.io) for the NFT and token check.
+
+**Safety rails built in:**
+
+- **NFTs and tokens are protected.** Before any spend, every coin is checked against GorillaPool's 1Sat indexer, including BSV-20 outputs, which the indexer only returns on request, and every page of results. Flagged coins and every 1-sat coin are left alone. If the check can't run, nothing is sent.
+- **Coins are verified before signing.** Each input's source transaction is fetched and must be a plain payment of the expected amount to your address, so an inscription or a wrong amount from the API is refused.
+- **Scans fail loudly.** Requests are rate-limited and retried; a scan that can't reach the network stops with an error instead of showing a partial result as complete.
+- **Fees are sanity-checked**, and every irreversible action asks for confirmation.
+- **Auto-lock.** Keys are wiped after 10 minutes without activity or 60 seconds in a background tab. With a saved backup you unlock with its password.
+
+Only enter a seed phrase on a device you trust, and consider moving recovered coins to a fresh wallet afterwards.
 
 ## Development
-This project is built with React, TypeScript, and Vite.
-```
-npm run build      # production build
+
+Built with React 19, TypeScript and Vite, on [`@bsv/sdk`](https://github.com/bsv-blockchain/ts-sdk).
+
+```bash
+npm run dev         # dev server on :5173
+npm run build       # typecheck + production build
 npm run lint
-npm test           # vitest unit tests + legacy signing scripts
+npm test            # vitest unit tests + signing scripts
+npm run terms:md    # regenerate TERMS.md after editing src/terms.ts
 ```
-Core logic lives in `src/lib` (derivation, network, token protection, transaction building, vault) and is UI-free; panels live in `src/components`.
 
-## Disclaimer
+| Folder | What's in it |
+| --- | --- |
+| `src/lib` | UI-free logic: derivation and presets, network clients, NFT/token protection, scanning, transaction building, the BRC-100 sweep and the encrypted vault |
+| `src/components` | The panels and shared UI (popover selects, tooltips, explainers, tab bar) |
+| `src/hooks` | Auto-lock, theme and task/status helpers |
+| `public/wallets` | Wallet icons, bundled so nothing loads from third-party sites |
 
-See also the Terms of Use in the app (the "Terms of Use" link in the footer, or `#terms`).
+Unit tests cover the BIP44 test vectors, path parsing, NFT/token filtering, the vault and transaction building against a mocked API. [CLAUDE.md](CLAUDE.md) has architecture notes and the rules every spend must follow. The `SECURITY_*.md` files are a review of the original version of this tool and predate the current code.
+
+## Terms of Use and disclaimer
+
+By using Derivation Path you agree to the [Terms of Use](TERMS.md), which are also shown in the app (footer link, or `#terms`). They cover the no-warranty and no-liability terms, your responsibilities, a waiver of class and collective actions, and Dutch law as the governing law.
 
 THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY AND NON-INFRINGEMENT. YOU USE IT ENTIRELY AT YOUR OWN RISK. TO THE FULLEST EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE AUTHORS, CONTRIBUTORS, COPYRIGHT HOLDERS OR ANYONE HOSTING THIS SOFTWARE BE LIABLE FOR ANY CLAIM, LOSS OF FUNDS OR DIGITAL ASSETS, LOSS OF DATA, OR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR OTHER DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT (INCLUDING NEGLIGENCE) OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. NOTHING HERE IS FINANCIAL, LEGAL OR TAX ADVICE. BLOCKCHAIN TRANSACTIONS ARE IRREVERSIBLE, AND NO ONE CAN RECOVER FUNDS SENT TO THE WRONG ADDRESS OR A LOST SEED PHRASE, PASSPHRASE OR PASSWORD.
 
 ## License
-MIT License. See [LICENSE](LICENSE) for details.
+
+[Apache License 2.0](LICENSE.txt).

@@ -1,5 +1,5 @@
 {
-  "name": "centbee-to-brc100",
+  "name": "derivationpath",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run && npm run test:legacy",
     "test:unit": "vitest run",
-    "test:legacy": "npx tsx test-key-alignment.ts && npx tsx test-signature-validation.ts && npx tsx test-transaction-signing.ts"
+    "test:legacy": "npx tsx test-key-alignment.ts && npx tsx test-signature-validation.ts && npx tsx test-transaction-signing.ts",
+    "terms:md": "npx tsx scripts/terms-md.ts"
   },
   "dependencies": {
     "@bsv/sdk": "^1.8.2",
