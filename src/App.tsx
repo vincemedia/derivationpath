@@ -11,7 +11,9 @@ import { useTheme } from './hooks/useTheme';
 import { ArrowUpRight, Clock3, FileLock2, Gem, KeyRound, Moon, ScanSearch, ShieldAlert, SlidersHorizontal, Sun } from 'lucide-react';
 import { BsvLogo } from './components/BsvLogo';
 import { BalanceCard } from './components/BalanceCard';
+import { DISCLAIMER_SUMMARY, DISCLAIMER_TEXT } from './disclaimer';
 import { MobileTabBar } from './components/MobileTabBar';
+import { TermsPage } from './components/TermsPage';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/Tooltip';
 import { useConfirmDialog } from './components/ConfirmDialog';
 import { WalletPanel } from './components/WalletPanel';
@@ -23,7 +25,7 @@ import { BackupPanel } from './components/BackupPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 
 const PANELS = [
-  { id: 'wallet', info: "Enter your seed phrase and pick which wallet app it came from. Your keys are made right here in your browser.", label: 'Wallet', caption: 'Seed phrase & path', icon: KeyRound, Component: WalletPanel },
+  { id: 'wallet', info: "Load a wallet and pick which wallet app it came from. Keys are worked out right here in your browser and never leave it.", label: 'Wallet', caption: 'Seed phrase & path', icon: KeyRound, Component: WalletPanel },
   { id: 'recover', info: "Checks your addresses on the blockchain for coins, then moves everything it finds into your BRC-100 wallet or any address you choose.", label: 'Recover', caption: 'Find & move your coins', icon: ScanSearch, Component: RecoverPanel },
   { id: 'send', info: "Pay someone from the address selected on the Wallet tab. You review the transaction before anything is sent.", label: 'Send', caption: 'Pay from this address', icon: ArrowUpRight, Component: SendPanel },
   { id: 'tokens', info: "Shows the NFTs (ordinals) and tokens at this address. They are kept out of every payment so you can't spend them by accident.", label: 'Tokens', caption: 'NFTs & tokens', icon: Gem, Component: TokensPanel },
@@ -57,6 +59,22 @@ function App() {
   const [vaultExists, setVaultExists] = useState(localVault.exists);
   const [panel, setPanel] = useState<string>('wallet');
   const [noticeOpen, setNoticeOpen] = useState(false);
+  // Terms of Use live at #terms so they have a shareable link. The app stays
+  // mounted underneath, so viewing them never wipes a loaded wallet or scan.
+  const [showTerms, setShowTerms] = useState(() => window.location.hash === '#terms');
+  useEffect(() => {
+    const sync = () => {
+      const terms = window.location.hash === '#terms';
+      setShowTerms(terms);
+      if (terms) window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  const closeTerms = () => {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    setShowTerms(false);
+  };
 
   // On phones a tab switch starts the new panel from the top of the page, so
   // a tap always visibly does something even when scrolled far down.
@@ -182,7 +200,7 @@ function App() {
   return (
     <AppContext.Provider value={state}>
       <TooltipProvider>
-      <div className="shell">
+      <div className={`shell${showTerms ? ' terms-view' : ''}`}>
         <header className="topbar">
           <div className="brand">
             <BsvLogo className="brand-logo" />
@@ -200,7 +218,6 @@ function App() {
               <BsvLogo className="bsv-mark" darkGlyph />
               {price ? `$${price.toFixed(2)}` : '-'}
             </span>
-            <span className="pill network"><span className="dot" />Mainnet · local</span>
             <button className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
@@ -209,7 +226,7 @@ function App() {
 
         <section className="intro">
           <h2>Find, recover and move your BSV.</h2>
-          <p>Enter a seed phrase from Centbee, RockWallet, ElectrumSV or another wallet. We find every address with coins and move them into your BRC-100 wallet.</p>
+          <p>Works with wallets like Centbee, RockWallet and ElectrumSV. It finds every address with coins and can move them into your BRC-100 wallet.</p>
         </section>
 
         <div className={`notice${noticeOpen ? ' open' : ''}`}>
@@ -217,7 +234,7 @@ function App() {
           <div>
             <b>Use at your own risk.</b>{' '}
             <button type="button" className="notice-toggle" aria-expanded={noticeOpen} onClick={() => setNoticeOpen(o => !o)}>{noticeOpen ? 'Less' : 'More'}</button>
-            <span className="notice-more"> For the safest setup, run this on your own computer after checking the <a href="https://github.com/bsv-blockchain-demos/mnemonic-to-brc100" target="_blank" rel="noopener noreferrer">source code</a>.<br />Only type your seed phrase on a device you trust, and check every transaction before you send it. Provided as-is, see <a href="/LICENSE.txt">LICENSE</a>.</span>
+            <span className="notice-more"> For the safest setup, run this on your own computer after checking the <a href="https://github.com/vincemedia/derivationpath" target="_blank" rel="noopener noreferrer">source code</a>.<br />Only type your seed phrase on a device you trust, and check every transaction before you send it. Provided as is, with no warranty and no liability for any loss. See the <a href="#terms">Terms of Use</a>.</span>
           </div>
         </div>
 
@@ -245,9 +262,9 @@ function App() {
               status={balanceStatus}
               price={price}
               onRefresh={() => void refreshBalance()}
-              onEnterPhrase={() => {
+              onGetStarted={() => {
                 selectPanel('wallet');
-                requestAnimationFrame(() => document.getElementById('mnemonicInput')?.focus());
+                requestAnimationFrame(() => document.getElementById('walletPreset')?.focus());
               }}
               onScan={() => selectPanel('recover')}
             />
@@ -262,11 +279,18 @@ function App() {
           </section>
         </main>
 
+        {showTerms && <TermsPage onBack={closeTerms} />}
+
         <footer className="footer">
-          Derivation Path · Use at your own risk
+          <p className="footer-summary"><b>Disclaimer:</b> {DISCLAIMER_SUMMARY}</p>
+          <details className="disclaimer">
+            <summary>Read the full disclaimer</summary>
+            <p>{DISCLAIMER_TEXT}</p>
+          </details>
+          <p><a href="#terms">Terms of Use</a> · <a href="https://github.com/vincemedia/derivationpath" target="_blank" rel="noopener noreferrer">Open source</a></p>
         </footer>
       </div>
-      <MobileTabBar items={PANELS.map(({ id, label, caption, icon }) => ({ id, label, caption, icon }))} primaryCount={4} active={panel} onSelect={selectPanel} />
+      {!showTerms && <MobileTabBar items={PANELS.map(({ id, label, caption, icon }) => ({ id, label, caption, icon }))} primaryCount={4} active={panel} onSelect={selectPanel} />}
       {dialog}
       </TooltipProvider>
     </AppContext.Provider>

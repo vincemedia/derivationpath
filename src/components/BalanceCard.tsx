@@ -2,7 +2,7 @@ import { KeyRound, Loader2, RefreshCw, ScanSearch, WifiOff } from 'lucide-react'
 import { fmtSats, fmtUsd } from '../lib/format';
 
 const STEPS = [
-  'Enter your seed phrase',
+  'Pick the wallet app you used',
   'Scan for coins on Recover',
   'Move them to your wallet',
 ];
@@ -12,14 +12,14 @@ const STEPS = [
  * three-step flow instead of showing empty dashes; at zero it points to a
  * full scan, since coins usually sit at other addresses.
  */
-export function BalanceCard({ address, path, balance, status, price, onRefresh, onEnterPhrase, onScan }: {
+export function BalanceCard({ address, path, balance, status, price, onRefresh, onGetStarted, onScan }: {
   address: string | null;
   path: string | null;
   balance: number | null;
   status: 'idle' | 'loading' | 'ok' | 'error';
   price: number;
   onRefresh: () => void;
-  onEnterPhrase: () => void;
+  onGetStarted: () => void;
   onScan: () => void;
 }) {
   if (!address) {
@@ -32,7 +32,7 @@ export function BalanceCard({ address, path, balance, status, price, onRefresh, 
           ))}
         </ol>
         <div className="actions balance-cta">
-          <button className="btn btn-primary btn-sm" onClick={onEnterPhrase}><KeyRound size={14} /> Enter seed phrase</button>
+          <button className="btn btn-primary btn-sm" onClick={onGetStarted}><KeyRound size={14} /> Get started</button>
         </div>
       </div>
     );

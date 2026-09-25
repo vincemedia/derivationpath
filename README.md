@@ -3,7 +3,7 @@
 This tool helps recover funds from Bitcoin SV (BSV) wallets that may no longer be online by deriving addresses from a mnemonic phrase, checking for unspent transaction outputs (UTXOs), and creating an ingest transaction compatible with BRC-100 wallets.
 
 **Important Security Note:**  
-For maximum security, we strongly recommend running this tool locally on your own machine. This ensures that your mnemonic phrase and PIN never leave your device. If you use the hosted version at [mnemonic-brc100.vercel.app](https://mnemonic-brc100.vercel.app), you must trust the host (@sirdeggen on GitHub) not to capture or misuse your sensitive information. Running locally eliminates this trust requirement and is the safer option when dealing with private keys and funds recovery.
+For maximum security, we strongly recommend running this tool locally on your own machine. This ensures that your mnemonic phrase and PIN never leave your device. If you use a hosted copy, you must trust whoever runs it not to capture or misuse your sensitive information. Running locally eliminates this trust requirement and is the safer option when dealing with private keys and funds recovery.
 
 ## Features
 - **Wallet & derivation**: import a 12–24 word BIP39 phrase (with optional PIN / BIP39 passphrase) or generate a new one. Pick a wallet preset (Centbee, RockWallet, BIP44, MoneyButton, Twetch, ElectrumSV, Exodus, RelayX, Keevo, Atomic, SimplyCash, BIP32) or type any template such as `m/44'/0'/0'/{chain}/{index}`. Shows address, public key, fingerprint and (behind a confirm) the WIF and mnemonic.
@@ -29,8 +29,8 @@ For maximum security, we strongly recommend running this tool locally on your ow
 
 1. Clone the repository:
    ```
-   git clone https://github.com/sirdeggen/centbee-to-brc100.git
-   cd centbee-to-brc100
+   git clone https://github.com/vincemedia/derivationpath.git
+   cd derivationpath
    ```
 
 2. Install dependencies:
@@ -82,6 +82,12 @@ npm run lint
 npm test           # vitest unit tests + legacy signing scripts
 ```
 Core logic lives in `src/lib` (derivation, network, token protection, transaction building, vault) and is UI-free; panels live in `src/components`.
+
+## Disclaimer
+
+See also the Terms of Use in the app (the "Terms of Use" link in the footer, or `#terms`).
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY AND NON-INFRINGEMENT. YOU USE IT ENTIRELY AT YOUR OWN RISK. TO THE FULLEST EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE AUTHORS, CONTRIBUTORS, COPYRIGHT HOLDERS OR ANYONE HOSTING THIS SOFTWARE BE LIABLE FOR ANY CLAIM, LOSS OF FUNDS OR DIGITAL ASSETS, LOSS OF DATA, OR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR OTHER DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT (INCLUDING NEGLIGENCE) OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. NOTHING HERE IS FINANCIAL, LEGAL OR TAX ADVICE. BLOCKCHAIN TRANSACTIONS ARE IRREVERSIBLE, AND NO ONE CAN RECOVER FUNDS SENT TO THE WRONG ADDRESS OR A LOST SEED PHRASE, PASSPHRASE OR PASSWORD.
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.

@@ -376,7 +376,7 @@ Three low-priority enhancements suggested (see [SECURITY_REVIEW.md](SECURITY_REV
 
 **For questions about the code:**
 - See: [README.md](README.md)
-- Repository: https://github.com/sirdeggen/centbee-to-brc100
+- Repository: https://github.com/vincemedia/derivationpath
 
 ---
 
