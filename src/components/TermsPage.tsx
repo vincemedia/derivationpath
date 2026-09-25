@@ -1,7 +1,7 @@
 import { ArrowLeft, FileText } from 'lucide-react';
 
 // Terms of Use. Drafted as a strict as-is / no-liability text; have it
-// reviewed by counsel (and add a governing-law clause) before relying on it.
+// reviewed by counsel before relying on it. Governing law: the Netherlands.
 export const TERMS_UPDATED = 'September 25, 2026';
 
 const SECTIONS: { title: string; body: string[] }[] = [
@@ -67,6 +67,19 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: '10. Changes, severability and entire agreement',
     body: [
       'These Terms may be updated at any time by publishing a new version; continued use after an update means you accept it. If any provision is found unenforceable, it will be enforced to the maximum extent permitted and the rest remain in full effect. These Terms, together with the licence, are the entire agreement between you and the Providers about the Software.',
+    ],
+  },
+  {
+    title: '11. No class or collective actions',
+    body: [
+      'TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, ANY CLAIM RELATING TO THE SOFTWARE OR THESE TERMS MAY BE BROUGHT ONLY IN YOUR INDIVIDUAL CAPACITY. YOU WAIVE ANY RIGHT TO BRING, JOIN, PARTICIPATE IN OR BENEFIT FROM ANY CLASS ACTION, COLLECTIVE ACTION (INCLUDING ANY COLLECTIVE ACTION UNDER ARTICLE 3:305A OF THE DUTCH CIVIL CODE), MASS CLAIM, REPRESENTATIVE PROCEEDING OR CONSOLIDATED ACTION AGAINST ANY PROVIDER, AND YOU AGREE NOT TO ASSIGN OR TRANSFER ANY SUCH CLAIM TO A CLAIM VEHICLE, FOUNDATION OR ASSOCIATION FOR THAT PURPOSE.',
+    ],
+  },
+  {
+    title: '12. Governing law and jurisdiction',
+    body: [
+      'These Terms, and any dispute or claim arising from or relating to them or the Software (including non-contractual disputes or claims), are governed exclusively by the laws of the Netherlands. The United Nations Convention on Contracts for the International Sale of Goods does not apply.',
+      'The competent court in Amsterdam, the Netherlands, has exclusive jurisdiction over any such dispute or claim, and you submit to that jurisdiction.',
     ],
   },
 ];
