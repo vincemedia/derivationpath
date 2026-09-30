@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0908" />
+    <!-- nothing to index: a password page in search results is one found by accident -->
+    <meta name="robots" content="noindex, nofollow" />
+    <!-- every locked path lands here, so the share card still describes the site, not the door -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Derivation Path: Recover BSV from any seed phrase" />
+    <meta property="og:image" content="/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Derivation Path</title>
+    <!--
+      The front door. Self-contained on purpose: everything else on the site
+      (scripts, styles, the video) is behind the gate, so this page can only
+      use what it carries, plus its font in /enter/.
+    -->
+    <style>
+      @font-face {
+        font-family: "Nunito Variable";
+        font-style: normal;
+        font-display: swap;
+        font-weight: 200 1000;
+        src: url("/enter/nunito.woff2") format("woff2-variations");
+      }
+      :root {
+        color-scheme: dark;
+        --bg: #0b0908;
+        --ink: #f4f2f0;
+        --muted: rgb(244 242 240 / 58%);
+        --gold: #ffaf00;
+        --gold-ink: #2d2d31;
+        --field: rgb(255 255 255 / 6%);
+        --line: rgb(255 255 255 / 12%);
+        --danger: #ff8a7a;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Nunito Variable", Nunito, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+      }
+
+      /* ── The cave behind it: tunnels, one trail lit, torchlight ── */
+      .cave { position: fixed; inset: 0; pointer-events: none; }
+      .cave svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .tunnel { fill: none; stroke-linecap: round; }
+      .tunnel.wall { stroke: #2e261f; }
+      .tunnel.floor { stroke: #0d0b09; }
+      .trail {
+        fill: none; stroke: var(--gold); stroke-width: 3.5; stroke-linecap: round;
+        filter: drop-shadow(0 0 6px rgb(255 175 0 / 80%));
+        stroke-dasharray: var(--len); stroke-dashoffset: var(--len);
+        animation: draw 4.2s cubic-bezier(.65, 0, .35, 1) .5s forwards;
+      }
+      .trail.halo { stroke-width: 14; opacity: .22; filter: blur(6px); }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      .chamber { fill: #0d0b09; stroke: #2e261f; stroke-width: 4; }
+      .chamber.found { stroke: var(--gold); opacity: 0; animation: appear .8s ease 4.4s forwards; filter: drop-shadow(0 0 10px rgb(255 175 0 / 70%)); }
+      @keyframes appear { to { opacity: 1; } }
+      /* the torchlight: warm pools that breathe, and the dark closing in at the edges */
+      .glow {
+        position: absolute; border-radius: 50%; filter: blur(70px);
+        background: radial-gradient(circle, rgb(255 150 30 / 34%), rgb(255 110 10 / 10%) 55%, transparent 72%);
+        animation: flicker 3.1s ease-in-out infinite alternate;
+      }
+      .glow.a { width: 900px; height: 900px; left: 50%; top: 50%; margin: -520px 0 0 -450px; }
+      .glow.b { width: 420px; height: 420px; left: var(--fx, 60%); top: var(--fy, 80%); margin: -210px 0 0 -210px; animation-duration: 2.3s; opacity: 0; animation: flicker 2.3s ease-in-out 4.4s infinite alternate, appear 1s ease 4.4s forwards; }
+      @keyframes flicker { 0% { transform: scale(.96); opacity: .85; } 40% { transform: scale(1.02); opacity: 1; } 100% { transform: scale(.98); opacity: .9; } }
+      .vignette { position: absolute; inset: 0; background: radial-gradient(75% 65% at 50% 48%, transparent 30%, rgb(5 4 3 / 88%) 100%); }
+      .grain { position: absolute; inset: -50%; width: 200%; height: 200%; opacity: .16; mix-blend-mode: overlay; }
+
+      /* ── The door ── */
+      main {
+        position: relative; z-index: 1; min-height: 100%;
+        display: grid; place-items: center; padding: 24px 16px 72px;
+      }
+      .door { width: min(400px, 100%); text-align: center; }
+      .brand { display: inline-flex; align-items: center; gap: 12px; }
+      .brand svg { width: 46px; height: 46px; filter: drop-shadow(0 10px 30px rgb(255 160 0 / 35%)); }
+      .word { font-size: 27px; font-weight: 800; letter-spacing: -0.025em; }
+      .word span { font-weight: 600; opacity: .6; }
+      .about { margin: 18px auto 0; max-width: 32ch; color: var(--muted); font-size: 16px; line-height: 1.5; text-wrap: balance; }
+      .tag {
+        display: inline-flex; align-items: center; gap: 8px; margin-top: 30px; padding: 6px 12px 6px 10px;
+        border-radius: 999px; background: rgb(255 175 0 / 10%); box-shadow: inset 0 0 0 1px rgb(255 175 0 / 22%);
+        color: #ffd27a; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+      }
+      .tag i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; }
+
+      form {
+        margin-top: 14px; padding: 8px; display: flex; gap: 8px;
+        border-radius: 22px; background: rgb(20 17 15 / 72%); backdrop-filter: blur(14px) saturate(1.3);
+        box-shadow: inset 0 0 0 1px var(--line), 0 30px 80px -30px rgb(0 0 0 / 90%);
+      }
+      .field { position: relative; flex: 1; min-width: 0; }
+      .field svg { position: absolute; left: 14px; top: 50%; width: 18px; height: 18px; margin-top: -9px; color: var(--muted); pointer-events: none; }
+      input {
+        width: 100%; height: 50px; padding: 0 14px 0 42px; border: 0; border-radius: 15px;
+        background: var(--field); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; outline: none;
+        box-shadow: inset 0 0 0 1px transparent; transition: box-shadow .2s ease, background-color .2s ease;
+      }
+      input::placeholder { color: rgb(244 242 240 / 38%); font-weight: 500; }
+      input:focus { background: rgb(255 255 255 / 8%); box-shadow: inset 0 0 0 1.5px rgb(255 175 0 / 60%); }
+      button {
+        flex-shrink: 0; height: 50px; padding: 0 20px; border: 0; border-radius: 15px; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--gold); color: var(--gold-ink); font: inherit; font-size: 16px; font-weight: 800;
+        transition: transform .15s ease, background-color .2s ease, box-shadow .2s ease;
+        box-shadow: 0 10px 30px -10px rgb(255 160 0 / 60%);
+      }
+      button:hover { background: #ffbb24; }
+      button:active { transform: scale(.97); }
+      button:focus-visible { outline: 3px solid rgb(255 175 0 / 45%); outline-offset: 2px; }
+      button[disabled] { opacity: .7; cursor: progress; }
+      button svg { width: 18px; height: 18px; }
+      .error { min-height: 22px; margin: 12px 0 0; color: var(--danger); font-size: 14px; font-weight: 700; }
+      form.wrong { animation: shake .42s cubic-bezier(.36, .07, .19, .97); box-shadow: inset 0 0 0 1px rgb(255 138 122 / 45%), 0 30px 80px -30px rgb(0 0 0 / 90%); }
+      @keyframes shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+
+      .path {
+        position: fixed; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); z-index: 1; text-align: center;
+        font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: .08em;
+        color: rgb(255 210 122 / 45%);
+      }
+      .path b { color: #ffd27a; font-weight: 700; }
+
+      /* rises in, once */
+      .rise { opacity: 0; transform: translateY(14px); filter: blur(6px); animation: rise .9s cubic-bezier(.22, 1, .36, 1) forwards; }
+      .rise:nth-child(2) { animation-delay: .12s; }
+      .rise:nth-child(3) { animation-delay: .24s; }
+      .rise:nth-child(4) { animation-delay: .34s; }
+      @keyframes rise { to { opacity: 1; transform: none; filter: none; } }
+
+      @media (max-width: 420px) {
+        form { flex-direction: column; }
+        button { justify-content: center; }
+        .word { font-size: 24px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .trail, .chamber.found, .glow, .rise { animation: none; }
+        .trail { stroke-dashoffset: 0; }
+        .chamber.found, .glow.b, .rise { opacity: 1; transform: none; filter: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cave" aria-hidden="true">
+      <svg id="tunnels" preserveAspectRatio="xMidYMid slice"></svg>
+      <div class="glow a"></div>
+      <div class="glow b" id="found-glow"></div>
+      <div class="vignette"></div>
+      <svg class="grain"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" stitchTiles="stitch" /></filter><rect width="100%" height="100%" filter="url(#n)" /></svg>
+    </div>
+
+    <main>
+      <div class="door">
+        <div class="brand rise">
+          <svg viewBox="0 0 2500 2500" aria-hidden="true"><path fill="#EAB300" d="M2496,1149c56,688-457,1292-1145,1347c-67,5-135,5-203,0C543,2448,52,1957,4,1351C-52,663,461,59,1149,4 c67-5,135-5,203,0C1957,52,2448,543,2496,1149z"/><path fill="#fff" d="M1608,1206c74-51,125-109,125-217c0-172-172-253-276-264c-9-1-32-2-32-2V558h-170l1,165h-114V559H969v163 c-30,1-213,1-213,1v146c0,0,46,0,60,0c57,0,84,36,84,61v9v630c-1,22-17,39-39,41c-26,1-65,0-65,0l-33,166h208v166h173v-166h114 v166h169v-166c0,0,9,0,12,0c196,0,366-116,369-303c2-154-129-243-199-268L1608,1206z M1143,1131V880c23,0,109,0,160,0 c5,0,9,1,13,1c70,3,113,31,136,64c14,20,22,44,22,68c0,17-3,34-9,50c-5,14-12,27-22,39c-8,10-16,18-26,25c-26,19-63,32-114,35 c-1,0-158,1-161,0v-31H1143z M1526,1502c-5,15-13,29-23,42c-8,11-18,19-29,27c-28,20-67,36-124,38c-1,0-205,1-207,1v-305 c25,0,151,1,206,1c5,0,9,1,15,1c75,4,122,33,147,70c15,22,24,47,25,74c-2,18-5,36-10,53l0,0V1502z"/></svg>
+          <h1 class="word">Derivation <span>Path</span></h1>
+        </div>
+        <p class="about rise">Finds and recovers BSV from a seed phrase, across the derivation paths of old wallets.</p>
+        <div class="rise"><span class="tag"><i></i>Private preview</span></div>
+        <div class="rise">
+          <form id="gate" novalidate>
+            <label class="field">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" aria-describedby="error" autofocus required />
+            </label>
+            <button type="submit" id="submit">Enter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+          </form>
+          <p class="error" id="error" role="alert"></p>
+        </div>
+      </div>
+    </main>
+    <div class="path" aria-hidden="true">m / 44' / 0 / 0 / <b>0</b></div>
+
+    <script>
+      // The tunnels: a branching tree like the derivation paths themselves,
+      // drawn once from a fixed seed so it looks the same on every visit.
+      (() => {
+        const NS = 'http://www.w3.org/2000/svg';
+        const W = 1600, H = 1000;
+        const svg = document.getElementById('tunnels');
+        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        let a = 20240930;
+        const rnd = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        const add = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+        const curve = (x1, y1, x2, y2) => { const my = (y1 + y2) / 2; return `M${x1} ${y1} C ${x1} ${my} ${x2} ${my} ${x2} ${y2}`; };
+        const FAN = [4, 3, 3, 2, 2];
+        const WIDTH = [22, 16, 11, 8, 5.5];
+        const segs = [];
+        const leaves = [];
+        (function grow(x, y, depth, spread, route) {
+          if (depth === FAN.length) { leaves.push({ x, y, route }); return; }
+          const n = FAN[depth];
+          for (let i = 0; i < n; i++) {
+            const nx = x + (i / (n - 1) - 0.5) * spread + (rnd() - 0.5) * spread * 0.14;
+            const ny = y + 175 + rnd() * 30;
+            const seg = { x, y, nx, ny, depth };
+            segs.push(seg);
+            grow(nx, ny, depth + 1, (spread / n) * 1.12, [...route, seg]);
+          }
+        })(W / 2, -40, 0, 1500, []);
+        const walls = add('g', {}), floors = add('g', {});
+        for (const s of segs) {
+          const d = curve(s.x, s.y, s.nx, s.ny);
+          add('path', { d, class: 'tunnel wall', 'stroke-width': WIDTH[s.depth] }, walls);
+          add('path', { d, class: 'tunnel floor', 'stroke-width': WIDTH[s.depth] * 0.5 }, floors);
+        }
+        for (const l of leaves) add('circle', { cx: l.x, cy: l.y, r: 9, class: 'chamber' });
+        // one trail lit, fork by fork, to a chamber right of centre and in
+        // view: the svg covers the screen, so a phone sees only its middle
+        const seen = Math.min(W, (innerWidth / innerHeight) * H);
+        const aim = W / 2 + seen * 0.3;
+        const target = leaves.reduce((best, l) => (Math.abs(l.x - aim) < Math.abs(best.x - aim) ? l : best));
+        const d = target.route.map((s, i) => (i ? curve(s.x, s.y, s.nx, s.ny).replace(/^M[^C]+/, '') : curve(s.x, s.y, s.nx, s.ny))).join(' ');
+        for (const cls of ['trail halo', 'trail']) {
+          const p = add('path', { d, class: cls });
+          p.style.setProperty('--len', p.getTotalLength());
+        }
+        add('circle', { cx: target.x, cy: target.y, r: 11, class: 'chamber found' });
+        // the glow over the found chamber, in screen terms (the svg is centred and cropped to cover)
+        const place = () => {
+          const s = Math.max(innerWidth / W, innerHeight / H);
+          const g = document.getElementById('found-glow');
+          g.style.setProperty('--fx', `${innerWidth / 2 + (target.x - W / 2) * s}px`);
+          g.style.setProperty('--fy', `${innerHeight / 2 + (target.y - H / 2) * s}px`);
+        };
+        place();
+        addEventListener('resize', place);
+      })();
+
+      // The form: the password is checked on the server (/api/enter), which
+      // sets the cookie the gate looks for. Then on to wherever they wanted.
+      (() => {
+        const form = document.getElementById('gate');
+        const input = document.getElementById('password');
+        const button = document.getElementById('submit');
+        const error = document.getElementById('error');
+        const next = (() => {
+          const n = new URLSearchParams(location.search).get('next');
+          return n && n.startsWith('/') && !n.startsWith('//') ? n : '/';
+        })();
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          form.classList.remove('wrong');
+          error.textContent = '';
+          button.disabled = true;
+          try {
+            const res = await fetch('/api/enter', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ password: input.value }),
+              credentials: 'same-origin',
+            });
+            if (res.ok) { location.replace(next); return; }
+            const data = await res.json().catch(() => ({}));
+            error.textContent = data.error || "That's not the password.";
+          } catch {
+            error.textContent = "Couldn't reach the server. Try again.";
+          }
+          button.disabled = false;
+          void form.offsetWidth; // restart the shake on a repeat
+          form.classList.add('wrong');
+          input.select();
+        });
+      })();
+    </script>
+  </body>
+</html>
