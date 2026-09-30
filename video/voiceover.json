@@ -1,0 +1,30 @@
+{
+  "_about": "The voice-over, line by line. Each line starts `at` seconds into its scene (the labels in stage.js), so it keeps its place when scenes change length. subtitles.py turns this into the subtitles, explainer.vtt and docs/explainer/voiceover.md; speechify.py or elevenlabs.py records it. Lines spoken over title cards are heard but not subtitled (the title says it).",
+  "voice": {
+    "wordsPerSecond": 2.6,
+    "speechify": {
+      "voice": "chase",
+      "model": "simba-3.2"
+    },
+    "elevenlabs": {
+      "model": "eleven_multilingual_v2",
+      "stability": 0.5,
+      "similarity_boost": 0.8,
+      "style": 0.15
+    }
+  },
+  "lines": [
+    { "scene": "Cold open: the cave at night", "at": 0.5, "text": "Your coins never left the blockchain. They're waiting… deep inside a cave." },
+    { "scene": "“Introducing Derivation Path”", "at": 0.3, "text": "Introducing Derivation Path." },
+    { "scene": "The door: your seed phrase", "at": 0.3, "text": "Your seed phrase is the password. Say all twelve words, in the right order… and the stone door rolls open." },
+    { "scene": "Inside: thousands of dark tunnels", "at": 0.3, "text": "But inside, it's pitch dark. There are thousands of tunnels, and your coins sit in just a few of them." },
+    { "scene": "The torch: your derivation path", "at": 0.2, "text": "The derivation path is your torch. It's a list of turns, like 44, 0, 0, that lights the one trail from the door to your coins." },
+    { "scene": "The chambers: your addresses", "at": 0.3, "text": "Every chamber along the trail is one of your addresses, with your coins and their history." },
+    { "scene": "Wrong trail, empty cave", "at": 0.2, "text": "Here's the catch: every wallet app lit its own trail. Same password, different turns… so the wrong path shows an empty cave, even when your coins are right there." },
+    { "scene": "App: pick your wallet, enter your phrase", "at": 0.2, "text": "Derivation Path knows the trails of Centbee, RockWallet, ElectrumSV and more. Pick your old wallet, and enter your phrase." },
+    { "scene": "App: scan every trail", "at": 0.2, "text": "Not sure which one? It walks every trail it knows, until it finds only empty chambers, and lists every address with coins." },
+    { "scene": "App: move your coins", "at": 0.2, "text": "Then move them into your BRC-100 wallet, or to any address. You check every transaction before it's sent." },
+    { "scene": "In your browser only", "at": 0.2, "text": "It all runs in your browser. Your phrase never leaves your device." },
+    { "scene": "Close: Derivation Path, start recovering", "at": 0.3, "text": "Derivation Path. Find your way back to your coins." }
+  ]
+}

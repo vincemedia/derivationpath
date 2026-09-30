@@ -15,11 +15,13 @@ export interface TabItem {
  * in a small popover that also carries each item's one-line caption, since
  * hover tooltips don't exist on touch.
  */
-export function MobileTabBar({ items, primaryCount, active, onSelect }: {
+export function MobileTabBar({ items, primaryCount, active, onSelect, locked = false }: {
   items: TabItem[];
   primaryCount: number;
   active: string;
   onSelect: (id: string) => void;
+  /** Until the risk notice is acknowledged the tabs are shown but can't be used. */
+  locked?: boolean;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const primary = items.slice(0, primaryCount);
@@ -34,7 +36,7 @@ export function MobileTabBar({ items, primaryCount, active, onSelect }: {
   );
 
   return (
-    <nav className="tabbar" aria-label="Wallet tools">
+    <nav className={`tabbar${locked ? ' locked' : ''}`} aria-label="Wallet tools" inert={locked}>
       {primary.map(i => tab(i.id, i.label, i.icon, i.id === active, () => onSelect(i.id)))}
       <Popover open={moreOpen} onOpenChange={setMoreOpen}>
         <PopoverTrigger asChild>

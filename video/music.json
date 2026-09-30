@@ -1,0 +1,12 @@
+{
+  "_about": "The music under the explainer: which track, where it's cropped, and how loud. Until a track is chosen (file: null) the soundtrack is the voice alone. To add one: put it in video/music/, set file, artist, title, bpm, and the drop (drop.track: seconds into the track of a strong downbeat; drop.video: where it should land in the video), then set BEAT_GRID in stage.js to { bpm, at: drop.video } so every cut lands on the beat. Levels are gains in dB on the track: low under the voice, mid under a line spoken over a title card, high on a title card while nobody speaks.",
+  "file": null,
+  "artist": "",
+  "title": "",
+  "bpm": 120,
+  "drop": { "track": 0, "video": 0 },
+  "levels": { "low": -26, "mid": -19, "high": -14 },
+  "ramps": { "up": 0.5, "down": 0.5, "beforeVoice": 0.25, "afterVoice": 0.15 },
+  "fadeIn": 0.4,
+  "fadeOut": 1.8
+}

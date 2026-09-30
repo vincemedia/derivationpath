@@ -8,11 +8,12 @@ import { localVault, type SeedRecord } from './lib/vault';
 import { errorMessage, safeInt } from './lib/format';
 import { useAutoLock } from './hooks/useAutoLock';
 import { useTheme } from './hooks/useTheme';
-import { ArrowUpRight, Clock3, FileLock2, Gem, KeyRound, Moon, ScanSearch, ShieldAlert, SlidersHorizontal, Sun } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Check, Lock, Clock3, Code, MonitorSmartphone, SearchCheck, FileLock2, Gem, KeyRound, Moon, ScanSearch, ShieldAlert, SlidersHorizontal, Sun } from 'lucide-react';
 import { BsvLogo } from './components/BsvLogo';
 import { BalanceCard } from './components/BalanceCard';
 import { DISCLAIMER_SUMMARY, DISCLAIMER_TEXT } from './disclaimer';
 import { MobileTabBar } from './components/MobileTabBar';
+import { Hero } from './components/Hero';
 import { TermsPage } from './components/TermsPage';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/Tooltip';
 import { useConfirmDialog } from './components/ConfirmDialog';
@@ -41,7 +42,17 @@ const defaultSelection = (): Selection => ({
   index: 0,
 });
 
+const LS_NOTICE = 'dp-notice-dismissed';
+
 const NO_LOCK: LockState = { engaged: false, reason: '' };
+
+/** Scroll position that puts the top of the tool just under the sticky top bar. */
+function toolTop() {
+  const tool = document.getElementById('tool');
+  if (!tool) return 0;
+  const bar = document.querySelector<HTMLElement>('.topbar')?.offsetHeight ?? 0;
+  return Math.max(0, tool.getBoundingClientRect().top + window.scrollY - bar - 12);
+}
 
 function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -58,7 +69,18 @@ function App() {
   const [notice, setNotice] = useState('');
   const [vaultExists, setVaultExists] = useState(localVault.exists);
   const [panel, setPanel] = useState<string>('wallet');
-  const [noticeOpen, setNoticeOpen] = useState(false);
+  // The risk notice stays until it's acknowledged once in this browser; the
+  // footer keeps the full disclaimer either way.
+  const [noticeDismissed, setNoticeDismissed] = useState(() => {
+    try { return localStorage.getItem(LS_NOTICE) === '1'; } catch { return false; }
+  });
+  const noticeDismissedRef = useRef(noticeDismissed);
+  noticeDismissedRef.current = noticeDismissed;
+  const locked = !noticeDismissed;
+  const dismissNotice = () => {
+    setNoticeDismissed(true);
+    try { localStorage.setItem(LS_NOTICE, '1'); } catch { /* storage blocked: just for now */ }
+  };
   // Terms of Use live at #terms so they have a shareable link. The app stays
   // mounted underneath, so viewing them never wipes a loaded wallet or scan.
   const [showTerms, setShowTerms] = useState(() => window.location.hash === '#terms');
@@ -76,12 +98,35 @@ function App() {
     setShowTerms(false);
   };
 
-  // On phones a tab switch starts the new panel from the top of the page, so
-  // a tap always visibly does something even when scrolled far down.
+  // On phones a tab switch starts the new panel from the top of the tool, so
+  // a tap always visibly does something even when scrolled far down. Only
+  // when scrolled past it: from the hero, a tap shouldn't jump the page.
   const selectPanel = useCallback((id: string) => {
     setPanel(id);
-    if (window.matchMedia('(max-width: 900px)').matches) requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+    if (window.matchMedia('(max-width: 900px)').matches) requestAnimationFrame(() => {
+      const top = toolTop();
+      if (window.scrollY > top + 1) window.scrollTo({ top });
+    });
   }, []);
+  // The hero's gold button (and the explainer's last screen): open the Wallet
+  // panel, glide down to the tool and put the cursor on the wallet picker.
+  const showRules = useCallback(() => {
+    const el = document.getElementById('notice');
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el.classList.remove('nudge');
+    void el.offsetWidth; // restart the nudge animation on a repeat tap
+    el.classList.add('nudge');
+    document.getElementById('notice-ok')?.focus({ preventScroll: true });
+  }, []);
+  const startRecovering = useCallback(() => {
+    if (!noticeDismissedRef.current) { showRules(); return; }
+    setPanel('wallet');
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: toolTop() });
+      document.getElementById('walletPreset')?.focus({ preventScroll: true });
+    });
+  }, [showRules]);
   // Bumped whenever the session is replaced or wiped: panels are keyed on it,
   // so every derived key, scan result and built tx they hold is discarded.
   const [epoch, setEpoch] = useState(0);
@@ -224,22 +269,43 @@ function App() {
           </div>
         </header>
 
-        <section className="intro">
-          <h2>Find, recover and move your BSV.</h2>
-          <p>Works with wallets like Centbee, RockWallet and ElectrumSV. It finds every address with coins and can move them into your BRC-100 wallet.</p>
-        </section>
+        <Hero onStartRecovering={startRecovering} />
 
-        <div className={`notice${noticeOpen ? ' open' : ''}`}>
-          <ShieldAlert size={18} aria-hidden />
-          <div>
-            <b>Use at your own risk.</b>{' '}
-            <button type="button" className="notice-toggle" aria-expanded={noticeOpen} onClick={() => setNoticeOpen(o => !o)}>{noticeOpen ? 'Less' : 'More'}</button>
-            <span className="notice-more"> For the safest setup, run this on your own computer after checking the <a href="https://github.com/vincemedia/derivationpath" target="_blank" rel="noopener noreferrer">source code</a>.<br />Only type your seed phrase on a device you trust, and check every transaction before you send it. Provided as is, with no warranty and no liability for any loss. See the <a href="#terms">Terms of Use</a>.</span>
-          </div>
-        </div>
+        {!noticeDismissed && (
+          <section className="notice" id="notice" aria-labelledby="notice-title">
+            <div className="notice-head">
+              <span className="notice-chip" aria-hidden><ShieldAlert size={18} /></span>
+              <div>
+                <h2 id="notice-title">Before you start</h2>
+                <p className="notice-lede">Read these three rules, then press <b>Got it</b> to unlock the tool.</p>
+              </div>
+            </div>
+            <ul className="notice-points">
+              <li><MonitorSmartphone size={17} aria-hidden /><span><b>Use a device you trust.</b> Your phrase never leaves this browser, but anyone who sees it can take your coins.</span></li>
+              <li><SearchCheck size={17} aria-hidden /><span><b>Check before you send.</b> Payments on the blockchain can't be undone.</span></li>
+              <li><Code size={17} aria-hidden /><span><b>Safest: run it yourself.</b> The <a href="https://github.com/vincemedia/derivationpath" target="_blank" rel="noopener noreferrer">source code</a> is open, so you can run it on your own computer.</span></li>
+            </ul>
+            <div className="notice-foot">
+              <p className="notice-fine">Free and provided as is, with no warranty. Only use wallets that are yours; you're responsible for every transaction. See the <a href="#terms">Terms of Use</a>.</p>
+              <button type="button" id="notice-ok" className="btn btn-primary notice-dismiss" onClick={dismissNotice}><Check size={16} /> Got it</button>
+            </div>
+          </section>
+        )}
 
-        <main className="layout">
-          <aside className="sidebar">
+        <main className={`layout${locked ? ' locked' : ''}`} id="tool">
+          {locked && (
+            <div className="tool-lock">
+              <div className="tool-lock-card" role="status">
+                <span className="notice-chip" aria-hidden><Lock size={18} /></span>
+                <div>
+                  <b>Read the rules first</b>
+                  <span>Press Got it above to unlock the tool.</span>
+                </div>
+                <button type="button" className="btn btn-ink" onClick={showRules}><ArrowUp size={16} /> Show me</button>
+              </div>
+            </div>
+          )}
+          <aside className="sidebar" inert={locked}>
             <div className="card nav-card">
               <nav className="nav" aria-label="Wallet tools">
                 {PANELS.map(({ id, label, caption, info, icon: Icon }) => (
@@ -270,7 +336,7 @@ function App() {
             />
           </aside>
 
-          <section>
+          <section inert={locked}>
             {PANELS.map(({ id, Component }) => (
               <div key={`${id}-${epoch}`} className={`panel${panel === id ? ' active' : ''}`}>
                 <Component />
@@ -290,7 +356,7 @@ function App() {
           <p><a href="#terms">Terms of Use</a> · <a href="https://github.com/vincemedia/derivationpath" target="_blank" rel="noopener noreferrer">Open source</a></p>
         </footer>
       </div>
-      {!showTerms && <MobileTabBar items={PANELS.map(({ id, label, caption, icon }) => ({ id, label, caption, icon }))} primaryCount={4} active={panel} onSelect={selectPanel} />}
+      {!showTerms && <MobileTabBar locked={locked} items={PANELS.map(({ id, label, caption, icon }) => ({ id, label, caption, icon }))} primaryCount={4} active={panel} onSelect={selectPanel} />}
       {dialog}
       </TooltipProvider>
     </AppContext.Provider>
