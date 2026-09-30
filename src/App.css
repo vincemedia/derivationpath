@@ -153,6 +153,20 @@ svg.lucide { flex-shrink: 0; }
 .tool-lock-card span:not(.notice-chip) { color: var(--muted-foreground); font-size: 13.5px; }
 .tabbar.locked .tab { opacity: .4; }
 
+/* ── Seed phrase entry, locked behind its own warning ── */
+.phrase-zone.locked .phrase-fields { opacity: .38; filter: saturate(.4); user-select: none; }
+.phrase-gate {
+  display: flex; align-items: flex-start; gap: 14px; margin: 0 0 18px; padding: 16px;
+  border-radius: var(--radius-xl); font-size: 13.5px;
+  background: color-mix(in srgb, var(--warning) 9%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning) 22%, transparent);
+}
+.phrase-gate-text { flex: 1; min-width: 0; }
+.phrase-gate-text b { font-size: 15px; font-weight: 800; }
+.phrase-gate-text p { margin: 3px 0 0; color: var(--muted-foreground); line-height: 1.5; }
+.phrase-gate-text a { color: inherit; }
+.phrase-gate .btn { flex-shrink: 0; align-self: center; }
+
 .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
 .sidebar { position: sticky; top: 76px; display: grid; gap: 16px; }
 
@@ -509,6 +523,8 @@ textarea.mono { font-size: 12.5px; }
   /* the lock card: just the title and the button */
   .tool-lock-card { margin-top: 24px; padding: 10px 10px 10px 16px; }
   .tool-lock-card .notice-chip, .tool-lock-card span:not(.notice-chip) { display: none; }
+  .phrase-gate { flex-wrap: wrap; }
+  .phrase-gate .btn { width: 100%; }
   .notice-foot { flex-direction: column; align-items: stretch; gap: 12px; }
 
   /* Balance becomes a slim strip above the panel. */

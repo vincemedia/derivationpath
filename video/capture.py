@@ -182,6 +182,9 @@ def open_app(s):
     # the tool stays locked until the rules are acknowledged
     s.pg.locator("#notice-ok").click()
     s.wait(400)
+    # and typing a seed phrase is behind its own warning
+    s.pg.locator("#phrase-accept").click()
+    s.wait(300)
 
 
 def to_tab(s, name):

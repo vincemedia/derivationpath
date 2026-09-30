@@ -11,6 +11,8 @@ import { OptionIcon, Select } from './Select';
 import { LabelWithInfo } from './InfoTip';
 import { useTask } from '../hooks/useTask';
 
+const LS_PHRASE_RISK = 'dp-phrase-risk-accepted';
+
 type CopyField = 'mnemonic' | 'wif' | 'publicKey' | 'address' | 'fingerprint';
 
 const COPY_NAMES: Record<CopyField, string> = {
@@ -30,6 +32,18 @@ export function WalletPanel() {
   const task = useTask(app.notice || (session ? 'Wallet loaded.' : 'No wallet is loaded.'));
 
   const hasChain = templateHasChain(selection.template);
+
+  // Typing a seed phrase is locked behind its own warning, remembered per
+  // browser. A loaded session (e.g. unlocked from a backup) skips it.
+  const [phraseAccepted, setPhraseAccepted] = useState(() => {
+    try { return localStorage.getItem(LS_PHRASE_RISK) === '1'; } catch { return false; }
+  });
+  const phraseLocked = !phraseAccepted && !session;
+  const acceptPhraseRisk = () => {
+    setPhraseAccepted(true);
+    try { localStorage.setItem(LS_PHRASE_RISK, '1'); } catch { /* storage blocked: just for now */ }
+    requestAnimationFrame(() => document.getElementById('mnemonicInput')?.focus());
+  };
 
   const applyPreset = (id: string) => {
     const preset = presetById(id);
@@ -144,39 +158,54 @@ export function WalletPanel() {
         <div className="field"><LabelWithInfo htmlFor="derivedPath" label="Derived path" info="The full path for the address shown below: the template with chain and index filled in. The same phrase and the same path always give the same address." /><input id="derivedPath" readOnly value={selected?.path ?? '-'} /></div>
       </div>
 
-      <SectionLabel>Recovery phrase</SectionLabel>
-      <div className="field"><label htmlFor="mnemonicInput">Seed phrase</label>
-        <textarea id="mnemonicInput" autoComplete="off" autoCapitalize="none" spellCheck={false} value={mnemonic} onChange={e => setMnemonic(e.target.value)}
-          placeholder="Type your 12 or 24 words, separated by spaces" />
-        <div className="hint">Your phrase stays in this browser. It's never sent anywhere.</div></div>
+      <SectionLabel>Seed phrase</SectionLabel>
+      <div className={`phrase-zone${phraseLocked ? ' locked' : ''}`}>
+        {phraseLocked && (
+          <div className="phrase-gate" role="group" aria-labelledby="phrase-gate-title">
+            <span className="notice-chip" aria-hidden><AlertTriangle size={18} /></span>
+            <div className="phrase-gate-text">
+              <b id="phrase-gate-title">For emergencies only</b>
+              <p>We recommend restoring your phrase in a wallet like <a href="https://electrumsv.io/" target="_blank" rel="noopener noreferrer">ElectrumSV</a> or <a href="https://www.exodus.com/" target="_blank" rel="noopener noreferrer">Exodus</a>.<br />We accept no liability for any loss. We don't recommend this feature.</p>
+            </div>
+            <button type="button" id="phrase-accept" className="btn btn-ink" onClick={acceptPhraseRisk}>I accept the risks</button>
+          </div>
+        )}
+        <div className="phrase-fields" inert={phraseLocked}>
+        <div className="field"><label htmlFor="mnemonicInput">Your words</label>
+          <textarea id="mnemonicInput" autoComplete="off" autoCapitalize="none" spellCheck={false} value={mnemonic} onChange={e => setMnemonic(e.target.value)}
+            placeholder="Type your 12 or 24 words, separated by spaces" />
+          <div className="hint">Your phrase stays in this browser. It's never sent anywhere.</div></div>
 
-      <div className="grid-2" style={{ marginTop: 15 }}>
-        <div className="field">
-          <LabelWithInfo htmlFor="passphrase" label="PIN / BIP39 passphrase (optional)" info="An optional extra password mixed into your seed. Leave it empty unless you set one. A different passphrase opens a completely different wallet, so a typo shows an empty wallet instead of an error." />
-          <input id="passphrase" type="password" autoComplete="off" value={passphrase} onChange={e => setPassphrase(e.target.value)} placeholder="Leave empty if you never set one" />
-          <div className="hint">Centbee users: enter your PIN here. If you lose it, you lose access to the coins.</div>
+        <div className="grid-2" style={{ marginTop: 15 }}>
+          <div className="field">
+            <LabelWithInfo htmlFor="passphrase" label="PIN / BIP39 passphrase (optional)" info="An optional extra password mixed into your seed. Leave it empty unless you set one. A different passphrase opens a completely different wallet, so a typo shows an empty wallet instead of an error." />
+            <input id="passphrase" type="password" autoComplete="off" value={passphrase} onChange={e => setPassphrase(e.target.value)} placeholder="Leave empty if you never set one" />
+            <div className="hint">Centbee users: enter your PIN here. If you lose it, you lose access to the coins.</div>
+          </div>
+          <div className="field">
+            <LabelWithInfo htmlFor="wordCount" label="New phrase length" info="Only used when you generate a new phrase. 24 words is stronger than 12, but both are far beyond anyone&apos;s ability to guess. Write the words on paper, in order, and keep them offline." />
+            <Select id="wordCount" value={String(bits)} onChange={v => setBits(safeInt(v, 256))} options={[
+              { value: '128', label: '12 words', detail: 'Strong, and quicker to write down', icon: <OptionIcon><Shield size={13} /></OptionIcon> },
+              { value: '256', label: '24 words', detail: 'Strongest', icon: <OptionIcon><ShieldCheck size={13} /></OptionIcon> },
+            ]} />
+            <div className="hint">Only used for "Generate new phrase".</div>
+          </div>
         </div>
-        <div className="field">
-          <LabelWithInfo htmlFor="wordCount" label="New phrase length" info="Only used when you generate a new phrase. 24 words is stronger than 12, but both are far beyond anyone&apos;s ability to guess. Write the words on paper, in order, and keep them offline." />
-          <Select id="wordCount" value={String(bits)} onChange={v => setBits(safeInt(v, 256))} options={[
-            { value: '128', label: '12 words', detail: 'Strong, and quicker to write down', icon: <OptionIcon><Shield size={13} /></OptionIcon> },
-            { value: '256', label: '24 words', detail: 'Strongest', icon: <OptionIcon><ShieldCheck size={13} /></OptionIcon> },
-          ]} />
-          <div className="hint">Only used for "Generate new phrase".</div>
-        </div>
-      </div>
 
-      <div className="actions">
-        <button className="btn btn-secondary" disabled={task.busy} onClick={() => task.run(() => {
-          const phrase = generateMnemonic(bits);
-          app.loadWallet(phrase, passphrase, `New ${ENTROPY_TO_WORDS[bits]}-word phrase created. Write it on paper (plus your passphrase, if you set one) before you put any money in.`);
-        })}><Sparkles size={16} /> Generate new phrase</button>
-        <button className="btn btn-primary" disabled={task.busy} onClick={() => task.run(() => {
-          app.loadWallet(mnemonic, passphrase, `Wallet loaded${passphrase ? ' with your passphrase' : ''}. Your seed phrase and private key are hidden.`);
-        })}><Download size={16} /> Load wallet</button>
-        <button className="btn btn-ghost" disabled={task.busy} onClick={async () => {
-          if (await app.confirm('Clear wallet?', 'This wipes the wallet from this page. A saved backup is not deleted.')) app.clearWallet();
-        }}><Trash2 size={16} /> Clear wallet</button>
+        <div className="actions">
+          <button className="btn btn-secondary" disabled={task.busy} onClick={() => task.run(() => {
+            const phrase = generateMnemonic(bits);
+            app.loadWallet(phrase, passphrase, `New ${ENTROPY_TO_WORDS[bits]}-word phrase created. Write it on paper (plus your passphrase, if you set one) before you put any money in.`);
+          })}><Sparkles size={16} /> Generate new phrase</button>
+          <button className="btn btn-primary" disabled={task.busy} onClick={() => task.run(() => {
+            app.loadWallet(mnemonic, passphrase, `Wallet loaded${passphrase ? ' with your passphrase' : ''}. Your seed phrase and private key are hidden.`);
+          })}><Download size={16} /> Load wallet</button>
+          <button className="btn btn-ghost" disabled={task.busy} onClick={async () => {
+            if (await app.confirm('Clear wallet?', 'This wipes the wallet from this page. A saved backup is not deleted.')) app.clearWallet();
+          }}><Trash2 size={16} /> Clear wallet</button>
+        </div>
+
+        </div>
       </div>
 
       {session && selected && (
