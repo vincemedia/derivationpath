@@ -1,5 +1,5 @@
 import { next } from '@vercel/functions';
-import { gateDecision } from './server/gate';
+import { gateDecision } from './server/gate.js';
 
 /**
  * The password gate, as Vercel Routing Middleware (it runs in front of the

@@ -1,4 +1,4 @@
-import { checkPassword, GATE_COOKIE, openCookie } from '../server/gate';
+import { checkPassword, GATE_COOKIE, openCookie } from '../server/gate.js';
 
 /**
  * POST /api/enter: check the shared password and open the door. On the server,
