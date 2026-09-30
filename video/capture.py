@@ -316,8 +316,6 @@ def main(only, check):
                                       color_scheme=theme, has_touch=True, is_mobile=True)
             # the app's own theme choice, before it first renders
             ctx.add_init_script(f"try {{ localStorage.clear(); localStorage.setItem('mnemonic-brc100-theme', '{theme}') }} catch {{}}")
-            # past the password gate (server/gate.ts)
-            ctx.add_cookies([{"name": "dp_gate", "value": "open", "url": BASE}])
             ctx.route("https://api.whatsonchain.com/**", woc)
             ctx.route("https://ordinals.gorillapool.io/**", ordinals)
             pg = ctx.new_page()
