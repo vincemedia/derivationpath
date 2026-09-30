@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { checkPassword, gateDecision, GATE_PATH, openCookie } from './server/gate'
+import { checkPassword, gateDecision, GATE_PATH, openCookie, splashFile } from './server/gate'
 
 /**
  * The password gate on the dev server too, so it can be reviewed locally. On
@@ -35,8 +35,8 @@ function gate(): Plugin {
           res.end();
           return;
         }
-        // Vercel's cleanUrls serves /enter from enter.html; so does this
-        if (url.pathname === GATE_PATH) req.url = `${GATE_PATH}.html${url.search}`;
+        // /enter serves whichever splash screen SPLASH_SCREEN picks, as middleware.ts does
+        if (url.pathname === GATE_PATH) req.url = `${splashFile()}${url.search}`;
         next();
       });
     },

@@ -23,20 +23,34 @@ export const GATE_VALUE = 'open';
 export const GATE_PATH = '/enter';
 
 /**
- * What a locked-out visitor may still fetch: the splash page and its own
- * files, the route that checks the password, and what a link preview needs.
- * Everything else, including the app's scripts and the video, stays behind the
- * gate.
+ * Which splash screen the gate shows. The mystery one (the default) names
+ * nothing: "?" for the app, its path and its share image. `SPLASH_SCREEN=named`
+ * switches to the one with the name, the line about the app and its share
+ * card. Read per request, so a redeploy after changing the env var is enough.
  */
-export function isOpenPath(pathname: string): boolean {
+export type Splash = 'mystery' | 'named';
+export function splash(): Splash {
+  return process.env.SPLASH_SCREEN === 'named' ? 'named' : 'mystery';
+}
+/** The file behind /enter for that screen. */
+export const splashFile = (which: Splash = splash()) => `${GATE_PATH}/${which}.html`;
+
+/**
+ * What a locked-out visitor may still fetch: the chosen splash screen and its
+ * font, the route that checks the password, and what a link preview needs.
+ * The other screen stays locked, so the mystery version can't be seen past by
+ * guessing the named one's address. Everything else, including the app's
+ * scripts and the video, stays behind the gate.
+ */
+export function isOpenPath(pathname: string, which: Splash = splash()): boolean {
   return (
     pathname === GATE_PATH ||
-    pathname === `${GATE_PATH}.html` ||
-    pathname.startsWith(`${GATE_PATH}/`) ||
+    pathname === splashFile(which) ||
+    pathname === `${GATE_PATH}/nunito.woff2` ||
     pathname === '/api/enter' ||
     pathname === '/favicon.svg' ||
-    pathname === '/og.png' ||
-    pathname === '/robots.txt'
+    pathname === '/robots.txt' ||
+    (which === 'mystery' ? pathname === `${GATE_PATH}/og-mystery.jpg` : pathname === '/og.png')
   );
 }
 
@@ -72,7 +86,7 @@ export function gateLocation(url: URL): string {
  */
 export function gateDecision(url: URL, cookieHeader: string | null | undefined): string | null {
   const open = isOpen(cookieHeader);
-  if (open && (url.pathname === GATE_PATH || url.pathname === `${GATE_PATH}.html`)) return safeNext(url.searchParams.get('next'));
+  if (open && (url.pathname === GATE_PATH || url.pathname === splashFile())) return safeNext(url.searchParams.get('next'));
   if (open || isOpenPath(url.pathname)) return null;
   return gateLocation(url);
 }
